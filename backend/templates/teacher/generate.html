@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Создать материалы — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set breadcrumbs = [
+    {'label': 'Выбор шаблона', 'href': '/teacher/select-template', 'current': False},
+    {'label': 'Создание материалов', 'href': None, 'current': True},
+    {'label': 'Редактирование', 'href': None, 'current': False},
+    {'label': 'Экспорт', 'href': None, 'current': False},
+  ] %}
+  {% include "partials/breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div x-data="generator()" class="space-y-6">
+  <div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+    <div class="bg-gradient-to-r from-stone-50 to-white px-6 py-5 border-b border-gray-100">
+      <h2 class="text-xl font-semibold text-stone-800">✨ Создать материалы</h2>
+      <p class="text-stone-500 text-sm mt-1">Рабочий лист по теме с опциональными педагогическими фишками</p>
+    </div>
+    <div class="p-6 space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="col-span-2">
+          <label class="block text-sm font-medium mb-1">Тема урока</label>
+          <input class="w-full border rounded-xl px-4 py-2.5" x-model="topic">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Класс</label>
+          <select class="w-full border rounded-xl px-4 py-2.5 bg-white" x-model.number="grade">
+            {% for g in range(1,12) %}<option value="{{ g }}">{{ g }} класс</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Предмет</label>
+          <select class="w-full border rounded-xl px-4 py-2.5 bg-white" x-model="subject">
+            <option>математика</option>
+            <option>русский</option>
+            <option>физика</option>
+            <option>биология</option>
+            <option>английский</option>
+          </select>
+        </div>
+      </div>
+
+      <details class="bg-stone-50 rounded-xl border border-stone-100" open>
+        <summary class="cursor-pointer px-4 py-3 font-medium">⚙️ Ручная настройка рабочего листа</summary>
+        <div class="px-5 pb-5 pt-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label class="text-sm font-medium">Заданий: <span x-text="params.task_count"></span></label>
+            <input type="range" min="3" max="10" class="w-full mt-2" x-model.number="params.task_count">
+            <template x-for="t in allTypes" :key="t.id">
+              <label class="flex items-center gap-2 text-sm mt-2">
+                <input type="checkbox" :checked="params.task_types.includes(t.id)" @change="toggleType(t.id,$event.target.checked)">
+                <span x-text="t.label"></span>
+              </label>
+            </template>
+          </div>
+          <div>
+            <label class="text-sm font-medium">Сложность</label>
+            <label class="flex gap-2 text-sm mt-2"><input type="radio" value="more_basic" x-model="params.difficulty_distribution"> Больше базовых</label>
+            <label class="flex gap-2 text-sm"><input type="radio" value="uniform" x-model="params.difficulty_distribution"> Равномерно</label>
+            <label class="flex gap-2 text-sm"><input type="radio" value="more_advanced" x-model="params.difficulty_distribution"> Больше сложных</label>
+          </div>
+          <div>
+            <label class="text-sm font-medium">Диагностика: <span x-text="params.diagnostic_time_sec"></span> сек</label>
+            <input type="range" min="10" max="120" step="5" class="w-full mt-2" x-model.number="params.diagnostic_time_sec">
+            <label class="flex gap-2 text-sm mt-3"><input type="checkbox" x-model="params.game_mode"> Игровой режим</label>
+          </div>
+        </div>
+      </details>
+
+      <details class="bg-stone-50 rounded-xl border border-stone-100">
+        <summary class="cursor-pointer px-4 py-3 font-medium">🎓 Педагогические фишки</summary>
+        <div class="px-5 pb-5 pt-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <label class="flex items-center gap-2"><input type="checkbox" x-model="params.pedagogical.sources.enabled"><span class="font-medium">📚 Библиотека источников</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" x-model="params.pedagogical.mistakes.enabled"><span class="font-medium">🔥 Горячая десятка</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" x-model="params.pedagogical.timing.enabled"><span class="font-medium">⏰ Шкала времени</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" x-model="params.pedagogical.scaffolding.enabled"><span class="font-medium">🪜 Скаффолдинг</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" x-model="params.pedagogical.emotional.enabled"><span class="font-medium">❤️ Эмоциональный интеллект</span></label>
+        </div>
+      </details>
+
+      <div class="flex flex-wrap items-center gap-4">
+        <button type="button" @click="submit()" :disabled="generating" class="bg-green-700 hover:bg-green-800 text-white font-medium px-6 py-2.5 rounded-xl shadow-md disabled:opacity-50">✨ Сгенерировать лист</button>
+        <span class="text-sm text-stone-600" x-show="generating" x-text="progressText"></span>
+        <p class="text-sm text-red-600" x-show="error" x-text="error"></p>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function defaultPedagogical(){return{sources:{enabled:false,mode:'auto',my_sources:[],show_in_pdf:false},mistakes:{enabled:false,count:5,add_lifehacks:false,add_common_traps:false},timing:{enabled:false,lesson_duration:40,show_on_handout:false,add_extra_tasks:false},scaffolding:{enabled:false,min_level:2,style:'steps',show_on_error_only:false},emotional:{enabled:false,type:'both',add_creative:false,collect_stats:false}}}
+function generator(){return{topic:'Дроби',grade:5,subject:'математика',generating:false,progressText:'',error:'',allTypes:[{id:'test',label:'Тест'},{id:'open',label:'Открытый'},{id:'problem',label:'Задача'},{id:'creative',label:'Творческое'},{id:'graph',label:'График'}],params:{task_count:5,task_types:['test','problem'],difficulty_distribution:'uniform',diagnostic_time_sec:30,answer_format:'mixed',game_mode:false,game_theme:null,pedagogical:defaultPedagogical()},toggleType(id,on){const a=this.params.task_types;const i=a.indexOf(id);if(on&&i===-1)a.push(id);if(!on&&i!==-1)a.splice(i,1);if(!a.length)a.push('test')},async submit(){this.error='';this.generating=true;this.progressText='Генерируем лист…';try{const body={topic:this.topic,grade:this.grade,subject:this.subject,generation_params:this.params};const r=await fetch('/generate-with-features',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json().catch(()=>({}));if(!r.ok){this.error=data.detail||'Ошибка '+r.status;return}window.location.href='/teacher/editor/'+data.material_id}catch(e){this.error='Сеть недоступна'}finally{this.generating=false;this.progressText=''}}}}
+</script>
+{% endblock %}

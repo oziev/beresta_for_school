@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Источники — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'sources' %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div x-data="sourcesPage()" x-init="load()" class="space-y-6">
+  <header class="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+    <h1 class="text-2xl font-semibold">🔗 Моя библиотека источников</h1>
+    <p class="text-stone-500 text-sm mt-1">Учебники, ВПР, авторские разработки. Beresta автоматически подставляет их к заданиям, если включена опция «Источники».</p>
+  </header>
+
+  <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+    <h2 class="font-semibold mb-3">Добавить источник</h2>
+    <form @submit.prevent="add()" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <input x-model="newName" required placeholder="Название (например, Мерзляк 5 класс)"
+             class="border rounded-xl px-3 py-2 md:col-span-2">
+      <select x-model="newCategory" class="border rounded-xl px-3 py-2">
+        <option value="">Категория</option>
+        <option>Учебник</option>
+        <option>ВПР</option>
+        <option>Авторская разработка</option>
+        <option>ФГОС</option>
+        <option>Сайт</option>
+      </select>
+      <button class="bg-green-700 text-white rounded-xl px-5 py-2 md:col-span-3">+ Добавить</button>
+    </form>
+  </section>
+
+  <section>
+    <h2 class="font-semibold mb-3 text-stone-700">Мои источники</h2>
+    <template x-if="items.length === 0">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center text-stone-500">
+        <p class="text-4xl mb-2">📚</p>
+        Источников пока нет.
+      </div>
+    </template>
+    <div class="space-y-2">
+      <template x-for="s in items" :key="s.id">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex justify-between items-center">
+          <div>
+            <span class="font-medium" x-text="s.name"></span>
+            <span class="text-xs bg-stone-100 text-stone-500 rounded-full ml-2 px-2 py-0.5"
+                  x-show="s.category" x-text="s.category"></span>
+          </div>
+          <button @click="del(s.id)" class="text-red-600 text-sm hover:underline">Удалить</button>
+        </div>
+      </template>
+    </div>
+  </section>
+</div>
+
+<script>
+function sourcesPage(){
+  return {
+    items: [], newName: '', newCategory: '',
+    async load(){
+      const r = await fetch('/sources');
+      this.items = await r.json();
+    },
+    async add(){
+      const r = await fetch('/sources', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name: this.newName, category: this.newCategory || null}),
+      });
+      if (!r.ok) { alert('Ошибка'); return; }
+      this.newName = ''; this.newCategory = '';
+      await this.load();
+    },
+    async del(id){
+      if (!confirm('Удалить источник?')) return;
+      await fetch('/sources/'+id, {method:'DELETE'});
+      await this.load();
+    }
+  };
+}
+</script>
+{% endblock %}

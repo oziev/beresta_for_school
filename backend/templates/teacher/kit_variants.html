@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Разноуровневые варианты — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'variants' %}
+  {% set kit_id = kit.id %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div x-data="variants('{{ kit.id }}')" x-init="loadExisting()" class="space-y-6">
+  <header class="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+    <h1 class="text-2xl font-semibold">🔀 Разноуровневые варианты</h1>
+    <p class="text-stone-500 text-sm mt-1">
+      Комплект: <a class="text-green-700 underline" href="/teacher/kits/{{ kit.id }}">{{ kit.name or kit.topic }}</a>.
+      Одним кликом ИИ создаст три копии: для слабых, средних и сильных учеников.
+    </p>
+  </header>
+
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="border-2 border-green-200 rounded-2xl p-5 bg-green-50">
+      <h2 class="font-semibold">🟢 Вариант А</h2>
+      <p class="text-sm text-stone-600">Для слабых: базовая сложность, больше подсказок.</p>
+    </div>
+    <div class="border-2 border-amber-200 rounded-2xl p-5 bg-amber-50">
+      <h2 class="font-semibold">🟡 Вариант Б</h2>
+      <p class="text-sm text-stone-600">Средний уровень — основной для класса.</p>
+    </div>
+    <div class="border-2 border-red-200 rounded-2xl p-5 bg-red-50">
+      <h2 class="font-semibold">🔴 Вариант В</h2>
+      <p class="text-sm text-stone-600">Для сильных: усложнённые формулировки и доп.задания.</p>
+    </div>
+  </section>
+
+  <div class="flex flex-wrap gap-3 items-center">
+    <button @click="create()" :disabled="loading"
+            class="bg-green-700 text-white rounded-xl px-5 py-2.5 disabled:opacity-60">
+      <span x-text="loading ? 'Создаём…' : 'Создать 3 варианта'"></span>
+    </button>
+    <a href="/teacher/kits/{{ kit.id }}" class="text-sm text-stone-500 hover:text-green-700">← Назад в редактор</a>
+    <span class="text-red-600 text-sm" x-text="error"></span>
+  </div>
+
+  <section x-show="created.length">
+    <h2 class="font-semibold mb-3 text-stone-700">Созданные варианты</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <template x-for="v in created" :key="v.id">
+        <a class="block border rounded-2xl p-4 bg-white hover:border-green-400 transition" :href="'/teacher/kits/'+v.id">
+          <div class="font-semibold" x-text="v.name"></div>
+          <div class="text-xs text-stone-500" x-text="(v.items?.length || 0) + ' раздаток'"></div>
+          <span class="inline-block mt-2 text-green-700 text-sm">Открыть →</span>
+        </a>
+      </template>
+    </div>
+  </section>
+</div>
+
+<script>
+function variants(id){
+  return {
+    loading:false, error:'', created:[],
+    async loadExisting(){
+      const r = await fetch('/kits');
+      if (!r.ok) return;
+      const all = await r.json();
+      this.created = (all || []).filter(k => k.parent_kit_id === id && k.mode === 'variant');
+    },
+    async create(){
+      this.loading = true; this.error = '';
+      try {
+        const r = await fetch('/kits/'+id+'/variants', {method:'POST'});
+        const data = await r.json().catch(()=>({}));
+        if (!r.ok) { this.error = data.detail || 'Ошибка'; return; }
+        this.created = data.variants || [];
+      } finally {
+        this.loading = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

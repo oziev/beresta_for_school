@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Создать по плану — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'plan' %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div x-data="planFlow()" class="bg-white rounded-2xl shadow-md border border-gray-100 p-6 space-y-6">
+  <header>
+    <h1 class="text-2xl font-semibold">📁 Создание по плану урока</h1>
+    <p class="text-stone-500 text-sm mt-1">Загрузите TXT/PDF/DOCX или вставьте текст. Beresta распарсит этапы и сделает раздатки.</p>
+  </header>
+
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="md:col-span-2">
+      <label class="block text-sm font-medium mb-1">Тема</label>
+      <input x-model="topic" class="w-full border rounded-xl px-4 py-2.5">
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Класс</label>
+      <input type="number" min="1" max="11" x-model.number="grade" class="w-full border rounded-xl px-4 py-2.5">
+    </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Предмет</label>
+      <input x-model="subject" class="w-full border rounded-xl px-4 py-2.5">
+    </div>
+  </div>
+
+  <div class="border-2 border-dashed border-green-200 rounded-2xl p-5 bg-green-50/40">
+    <label class="block text-sm font-semibold mb-2">Загрузите TXT / PDF / DOCX</label>
+    <input type="file" accept=".txt,.pdf,.docx" @change="upload($event)">
+    <p class="text-sm text-stone-500 mt-2">Или вставьте план вручную ниже.</p>
+  </div>
+
+  <textarea x-model="lesson_plan_content" rows="8"
+            class="w-full border rounded-xl p-3 font-mono text-sm"
+            placeholder="План урока..."></textarea>
+
+  <div x-show="stages.length" class="space-y-2">
+    <h2 class="font-semibold">Этапы</h2>
+    <template x-for="(s,i) in stages" :key="i">
+      <label class="flex items-center gap-3 border rounded-xl p-3 hover:bg-stone-50">
+        <input type="checkbox" x-model="s.needs_handout" class="accent-green-700">
+        <span class="font-medium" x-text="(i+1)+'. '+s.name"></span>
+        <span class="text-xs text-stone-500 bg-stone-100 rounded-full px-2 py-0.5"
+              x-text="s.recommended_handout_type"></span>
+        <span class="ml-auto flex items-center gap-2 text-sm">
+          <input type="number" min="1" max="180" x-model.number="s.time_minutes"
+                 class="w-20 border rounded-lg px-2 py-1 text-right">
+          <span class="text-stone-500">мин</span>
+        </span>
+      </label>
+    </template>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1">🎚️ Сложность: <span class="font-mono" x-text="['Базовый','Средний','Продвинутый'][global_complexity-1]"></span></label>
+    <input type="range" min="1" max="3" x-model.number="global_complexity" class="w-full accent-green-700">
+  </div>
+
+  <details class="border rounded-xl">
+    <summary class="cursor-pointer px-4 py-3 font-semibold">🧩 Педагогические фишки</summary>
+    <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+      <label class="flex items-center gap-2"><input type="checkbox" x-model="pedagogical.mistakes.enabled"> 🔥 Горячая десятка ошибок</label>
+      <label class="flex items-center gap-2"><input type="checkbox" x-model="pedagogical.scaffolding.enabled"> 🪜 Скаффолдинг</label>
+      <label class="flex items-center gap-2"><input type="checkbox" x-model="pedagogical.timing.enabled"> ⏱ Шкала времени</label>
+      <label class="flex items-center gap-2"><input type="checkbox" x-model="pedagogical.sources.enabled"> 🔗 Источники</label>
+      <label class="flex items-center gap-2"><input type="checkbox" x-model="pedagogical.emotional.enabled"> 🌈 Эмоциональная рефлексия</label>
+    </div>
+  </details>
+
+  <div class="flex gap-3 flex-wrap items-center">
+    <button @click="generate()" :disabled="loading"
+            class="bg-green-700 text-white rounded-xl px-5 py-2.5 disabled:opacity-60">
+      ✨ <span x-text="loading ? 'Работаем…' : 'Сгенерировать комплект'"></span>
+    </button>
+    <span class="text-red-600 text-sm" x-text="error"></span>
+  </div>
+</div>
+
+<script>
+function planFlow(){
+  return {
+    topic:'Дроби', grade:5, subject:'математика',
+    lesson_plan_content:'', stages:[],
+    global_complexity:2, loading:false, error:'',
+    lessonType: new URLSearchParams(location.search).get('lesson_type') || 'combined',
+    pedagogical:{
+      sources:{enabled:false,mode:'auto',my_sources:[],show_in_pdf:false},
+      mistakes:{enabled:false,count:5,add_lifehacks:true,add_common_traps:false},
+      timing:{enabled:false,lesson_duration:40,show_on_handout:false,add_extra_tasks:false},
+      scaffolding:{enabled:false,min_level:2,style:'steps',show_on_error_only:false},
+      emotional:{enabled:false,type:'both',add_creative:false,collect_stats:false},
+    },
+    async upload(e){
+      const file = e.target.files[0]; if (!file) return;
+      this.loading = true;
+      const form = new FormData(); form.append('file', file);
+      const r = await fetch('/upload-lesson-plan', {method:'POST', body: form});
+      const data = await r.json().catch(()=>({}));
+      this.loading = false;
+      if (!r.ok) { this.error = data.detail || 'Ошибка файла'; return; }
+      this.lesson_plan_content = data.content;
+      this.stages = data.stages || [];
+    },
+    async generate(){
+      this.loading = true; this.error = '';
+      try {
+        const r = await fetch('/generate-from-plan', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            topic: this.topic, grade: this.grade, subject: this.subject,
+            lesson_type: this.lessonType,
+            lesson_plan_content: this.lesson_plan_content,
+            stages: this.stages,
+            global_complexity: this.global_complexity,
+            pedagogical: this.pedagogical,
+          })
+        });
+        const data = await r.json().catch(()=>({}));
+        if (!r.ok) { this.error = data.detail || 'Ошибка генерации'; return; }
+        location.href = '/teacher/kits/' + data.kit_id;
+      } finally {
+        this.loading = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

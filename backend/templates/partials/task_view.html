@@ -1,0 +1,43 @@
+<div id="task-{{ idx }}" class="task-card border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
+  <div class="flex justify-between items-start">
+    <div class="flex items-center gap-2 flex-wrap">
+      <span class="text-xs font-bold px-2 py-1 rounded-full
+        {% if task.adaptive_level == 1 %}bg-green-100 text-green-800
+        {% elif task.adaptive_level == 3 %}bg-red-100 text-red-800
+        {% else %}bg-amber-100 text-amber-800{% endif %}">
+        Задание {{ idx + 1 }} ·
+        {% if task.adaptive_level == 1 %}базовый{% elif task.adaptive_level == 3 %}сложный{% else %}средний{% endif %}
+      </span>
+      <span class="text-xs text-stone-400">⏱️ {{ task.time_limit_sec }} сек · {{ task.type }}</span>
+    </div>
+    <div class="flex gap-2 shrink-0">
+      <button class="text-stone-500 hover:text-green-600 text-sm"
+              hx-get="/materials/{{ material_id }}/htmx/tasks/{{ idx }}/edit"
+              hx-target="#task-{{ idx }}" hx-swap="outerHTML">✏️</button>
+      <button class="text-stone-500 hover:text-amber-600 text-sm"
+              data-regen onclick="regenerateTask('{{ material_id }}', {{ idx }})">🔄</button>
+    </div>
+  </div>
+
+  <p class="mt-2 text-stone-800 font-medium">{{ task.text }}</p>
+
+  {% if task.options %}
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      {% for opt in task.options %}
+        <label class="flex items-center gap-2 text-sm border rounded-lg px-3 py-1.5 bg-stone-50 cursor-pointer hover:bg-green-50">
+          <input type="radio" name="q_{{ idx }}" disabled/> {{ loop.index0 }}) {{ opt }}
+        </label>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="mt-2 text-xs text-stone-400 border-t pt-2 flex justify-between">
+    <span>✅ Правильный ответ: <span class="font-mono">{{ task.correct }}</span></span>
+    <span class="text-green-600 cursor-pointer hover:underline"
+          hx-post="/generate/task"
+          hx-vals='{"material_id": "{{ material_id }}", "task_index": {{ idx }}}'
+          hx-target="#task-{{ idx }}" hx-swap="outerHTML">
+      ✨ Другой вариант
+    </span>
+  </div>
+</div>

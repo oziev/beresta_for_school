@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<style>
+  body { font-family: DejaVu Sans, sans-serif; font-size: 11pt; margin: 2cm; color: #1a1a1a; }
+  h1 { font-size: 15pt; }
+  .meta { font-size: 9pt; color: #666; margin-bottom: 16pt; }
+  .section { margin-bottom: 20pt; }
+  .bar-row { margin-bottom: 6pt; }
+  .bar-label { font-size: 10pt; margin-bottom: 2pt; }
+  .bar-bg { background: #e5e7eb; height: 10pt; border-radius: 4pt; }
+  .bar-fill { height: 10pt; border-radius: 4pt; background: #16a34a; }
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  th, td { border: 1px solid #ddd; padding: 5pt 8pt; text-align: left; }
+  th { background: #f3f4f6; }
+  .advice { border: 1pt solid #fde68a; background: #fffbeb; padding: 10pt; border-radius: 6pt; font-size: 11pt; }
+  footer { text-align: center; font-size: 8pt; color: #aaa; margin-top: 20pt; }
+</style>
+</head>
+<body>
+<h1>Отчёт по классу: {{ stats.topic }}</h1>
+<p class="meta">{{ stats.grade }} класс · {{ stats.session_count }} учеников завершили</p>
+
+<div class="section">
+  <b>Процент ошибок по заданиям</b>
+  {% for e in stats.errors_per_task %}
+  <div class="bar-row">
+    <div class="bar-label">Задание {{ e.task_index+1 }}: {{ e.error_pct }}%</div>
+    <div class="bar-bg"><div class="bar-fill" style="width:{{ e.error_pct }}%"></div></div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if stats.top_errors %}
+<div class="section">
+  <b>Топ-3 сложных задания</b>
+  <table>
+    <tr><th>№</th><th>Задание</th><th>Ошибок</th><th>%</th></tr>
+    {% for e in stats.top_errors %}
+    <tr>
+      <td>{{ e.task_index+1 }}</td>
+      <td>{{ e.task_text[:60] }}…</td>
+      <td>{{ e.wrong_count }} / {{ e.total_count }}</td>
+      <td>{{ e.error_pct }}%</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if advice %}
+<div class="section">
+  <b>Совет ИИ-методиста:</b>
+  <div class="advice">{{ advice }}</div>
+</div>
+{% endif %}
+
+<footer>Beresta Adaptive Pro · только статистика класса, без личных данных учеников</footer>
+</body>
+</html>

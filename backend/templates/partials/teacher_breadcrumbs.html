@@ -1,0 +1,56 @@
+{# Универсальные хлебные крошки v9.
+   current: 'create' | 'lesson-type' | 'plan' | 'scratch' | 'configure' | 'kit' | 'export' | 'dashboard' | 'variants' | 'templates' | 'sources' | 'profile'
+   kit_id (optional) — для ссылок на редактор и экспорт.
+#}
+{% set steps = [
+  {'key': 'create',      'label': 'Выбор режима',    'href': '/teacher/create'},
+  {'key': 'lesson-type', 'label': 'Тип урока',       'href': '/teacher/create/lesson-type'},
+  {'key': 'configure',   'label': 'Настройка этапов', 'href': '/teacher/configure-stages'},
+  {'key': 'plan',        'label': 'План урока',      'href': '/teacher/create/plan'},
+  {'key': 'scratch',     'label': 'Генерация',       'href': '/teacher/create/scratch'},
+  {'key': 'kit',         'label': 'Редактирование комплекта', 'href': '/teacher/kits' ~ ('/' ~ kit_id|string if kit_id else '')},
+  {'key': 'variants',    'label': 'Разноуровневые варианты', 'href': None},
+  {'key': 'dashboard',   'label': 'Дашборд',         'href': None},
+  {'key': 'export',      'label': 'Экспорт',         'href': None},
+] %}
+
+{# Базовая последовательность для основного flow #}
+{% set flow_keys = ['create', 'lesson-type', 'configure', 'kit', 'export'] %}
+{% if current == 'plan' %}
+  {% set flow_keys = ['create', 'lesson-type', 'plan', 'kit', 'export'] %}
+{% elif current == 'scratch' %}
+  {% set flow_keys = ['create', 'lesson-type', 'scratch', 'kit', 'export'] %}
+{% elif current == 'variants' %}
+  {% set flow_keys = ['create', 'lesson-type', 'kit', 'variants'] %}
+{% elif current == 'dashboard' %}
+  {% set flow_keys = ['create', 'kit', 'dashboard'] %}
+{% elif current == 'templates' or current == 'sources' or current == 'profile' %}
+  {% set flow_keys = ['create'] %}
+  {% set side_label = {'templates':'Шаблоны','sources':'Источники','profile':'Виртуальный двойник'}[current] %}
+{% endif %}
+
+<nav aria-label="Хлебные крошки" class="mb-6">
+  <ol class="flex flex-wrap items-center gap-1 text-sm">
+    {% for k in flow_keys %}
+      {% set step = (steps | selectattr('key', 'equalto', k) | list | first) %}
+      {% if step %}
+        <li class="flex items-center gap-1">
+          {% if not loop.first %}<span class="text-stone-300 select-none">→</span>{% endif %}
+          {% if step.key == current %}
+            <span class="font-semibold text-green-700">{{ step.label }}</span>
+          {% elif step.href %}
+            <a href="{{ step.href }}" class="text-stone-500 hover:text-green-700 transition">{{ step.label }}</a>
+          {% else %}
+            <span class="text-stone-400">{{ step.label }}</span>
+          {% endif %}
+        </li>
+      {% endif %}
+    {% endfor %}
+    {% if current in ('templates','sources','profile') %}
+      <li class="flex items-center gap-1">
+        <span class="text-stone-300 select-none">→</span>
+        <span class="font-semibold text-green-700">{{ side_label }}</span>
+      </li>
+    {% endif %}
+  </ol>
+</nav>

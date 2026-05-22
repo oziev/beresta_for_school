@@ -1,0 +1,50 @@
+<div id="task-{{ idx }}" class="border border-emerald-300 rounded-xl p-4 bg-white shadow-sm">
+  <form class="space-y-3"
+        hx-post="/materials/{{ material_id }}/htmx/tasks/{{ idx }}"
+        hx-target="#task-{{ idx }}" hx-swap="outerHTML">
+    <div class="text-sm font-semibold text-emerald-700">✏️ Редактирование задания {{ idx + 1 }}</div>
+
+    <label class="block text-sm">
+      Текст задания
+      <textarea name="text" rows="3" class="mt-1 w-full rounded-xl border px-3 py-2 text-sm" required>{{ task.text }}</textarea>
+    </label>
+
+    <div class="grid gap-3 sm:grid-cols-2">
+      <label class="block text-sm">
+        Тип
+        <select name="type" class="mt-1 w-full rounded-xl border px-3 py-2 bg-white text-sm">
+          {% for v in ['test','open','problem','creative','graph'] %}
+            <option value="{{ v }}" {% if task.type == v %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="block text-sm">
+        Уровень (1–3)
+        <input name="adaptive_level" type="number" min="1" max="3" class="mt-1 w-full rounded-xl border px-3 py-2 text-sm" value="{{ task.adaptive_level }}"/>
+      </label>
+    </div>
+
+    <label class="block text-sm">
+      Варианты (по одной строке; пусто — для открытого вопроса)
+      <textarea name="options_text" rows="4" class="mt-1 w-full rounded-xl border px-3 py-2 font-mono text-xs">{{ options_text }}</textarea>
+    </label>
+
+    <div class="grid gap-3 sm:grid-cols-2">
+      <label class="block text-sm">
+        Правильный ответ (индекс или текст)
+        <input name="correct" class="mt-1 w-full rounded-xl border px-3 py-2 text-sm" value="{{ task.correct }}"/>
+      </label>
+      <label class="block text-sm">
+        Время (сек)
+        <input name="time_limit_sec" type="number" class="mt-1 w-full rounded-xl border px-3 py-2 text-sm" value="{{ task.time_limit_sec }}"/>
+      </label>
+    </div>
+
+    <div class="flex gap-2 pt-1">
+      <button type="submit" class="rounded-xl bg-green-700 px-4 py-2 text-sm text-white font-medium">Сохранить</button>
+      <button type="button" class="rounded-xl border px-4 py-2 text-sm"
+              hx-get="/materials/{{ material_id }}/htmx/tasks/{{ idx }}/view"
+              hx-target="#task-{{ idx }}" hx-swap="outerHTML">Отмена</button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Мои материалы — Beresta{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-stone-800">📁 Мои материалы</h1>
+      <p class="text-sm text-stone-500">Все сгенерированные рабочие листы</p>
+    </div>
+    <a href="/teacher/select-template" class="bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium shadow-sm hover:bg-green-800">
+      + Создать новый
+    </a>
+  </div>
+
+  {% if materials %}
+  <div class="grid gap-4">
+    {% for m in materials %}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-wrap items-center justify-between gap-4 hover:border-green-200 transition">
+      <div class="min-w-0 flex-1">
+        <h2 class="font-semibold text-stone-800 text-lg truncate">{{ m.topic }}</h2>
+        <p class="text-sm text-stone-500 mt-0.5">
+          {{ m.grade }} класс · {{ m.subject }} ·
+          {{ m.tasks|length }} заданий ·
+          {{ m.created_at.strftime('%d.%m.%Y %H:%') if m.created_at else '—' }}
+        </p>
+        {% if m.teacher_edited %}<span class="text-xs text-amber-600 mt-1 inline-block">✏️ отредактировано</span>{% endif %}
+      </div>
+      <div class="flex flex-wrap gap-2 shrink-0">
+        <a href="/teacher/editor/{{ m.id }}" class="px-4 py-2 rounded-xl bg-green-700 text-white text-sm font-medium hover:bg-green-800">Открыть</a>
+        <a href="/teacher/dashboard/{{ m.id }}" class="px-4 py-2 rounded-xl border text-sm hover:bg-stone-50">📊 Дашборд</a>
+        <a href="/adapt/{{ m.id }}" class="px-4 py-2 rounded-xl border text-sm hover:bg-stone-50">📱 QR</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300">
+    <p class="text-4xl mb-3">📭</p>
+    <p class="text-stone-600">Материалов пока нет</p>
+    <a href="/teacher/select-template" class="inline-block mt-4 text-green-700 font-medium hover:underline">Создать первый лист →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

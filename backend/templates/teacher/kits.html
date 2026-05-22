@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Мои комплекты — Beresta{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex justify-between items-center">
+    <div><h1 class="text-2xl font-semibold">📦 Мои комплекты</h1><p class="text-stone-500 text-sm">Рабочие листы, комплекты и шаблоны</p></div>
+    <a href="/teacher/create" class="bg-green-700 text-white rounded-xl px-5 py-2.5">+ Создать</a>
+  </div>
+  <div class="space-y-3">
+    {% for kit in kits %}
+    <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-wrap justify-between gap-4">
+      <div>
+        <h2 class="font-semibold text-lg">{{ kit.name or kit.topic or 'Комплект' }}</h2>
+        <p class="text-sm text-stone-500">{{ kit.subject }} • {{ kit.grade }} класс • {{ kit.lesson_type or 'урок' }} • {{ kit.items|length }} материалов</p>
+        {% if kit.is_template %}<span class="text-xs bg-amber-100 text-amber-800 rounded-full px-2 py-1">Шаблон: {{ kit.template_name }}</span>{% endif %}
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <a class="border rounded-lg px-3 py-1.5" href="/teacher/kits/{{ kit.id }}">Открыть</a>
+        <a class="border rounded-lg px-3 py-1.5" href="/teacher/dashboard/{{ kit.id }}">Дашборд</a>
+        <a class="border rounded-lg px-3 py-1.5" href="/teacher/kits/{{ kit.id }}/variants">3 варианта</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-md border border-gray-100 p-8 text-center text-stone-500">Комплектов пока нет</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

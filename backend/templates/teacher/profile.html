@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Профиль — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'profile' %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div class="mb-2">
+  <h1 class="text-2xl font-bold text-stone-800">👤 Профиль учителя</h1>
+  <p class="text-sm text-stone-500">Виртуальный двойник и настройки стиля генерации</p>
+</div>
+<div class="space-y-6" x-data="twinApp()" x-init="load()">
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-2xl font-bold text-stone-800">🤖 Мой виртуальный двойник</h1>
+      <p class="text-sm text-stone-500" x-text="totalEdits ? `На основе ${totalEdits} ваших правок` : 'Правок пока нет'"></p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button @click="train()" :disabled="training"
+        class="rounded-full bg-green-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">
+        🔄 <span x-text="training ? 'Обучаю…' : 'Переобучить'"></span>
+      </button>
+      <button @click="reset()" class="rounded-full border border-red-300 text-red-600 px-4 py-2 text-sm">🗑️ Сбросить</button>
+    </div>
+  </div>
+
+  <div x-show="error" class="text-red-600 text-sm" x-text="error"></div>
+
+  <!-- No profile yet -->
+  <div x-show="!profile && !loading" class="rounded-2xl border border-dashed border-gray-300 p-10 text-center text-stone-400">
+    <p class="text-2xl mb-2">🤖</p>
+    <p>Двойник ещё не обучен.</p>
+    <p class="text-sm mt-1">Сделайте 20+ правок заданий, затем нажмите «Переобучить».</p>
+    <div class="mt-4 h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div class="h-2 bg-green-400 rounded-full transition-all" :style="`width:${Math.min(totalEdits/20*100,100)}%`"></div>
+    </div>
+    <p class="text-xs mt-1 text-stone-400" x-text="`${totalEdits} / 20 правок`"></p>
+  </div>
+
+  <!-- Profile loaded -->
+  <template x-if="profile">
+    <div class="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 space-y-4">
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="space-y-2 text-sm">
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Предпочитаемые типы:</span>
+            <span class="font-medium" x-text="(profile.preferred_task_types||[]).join(', ')"></span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Сложность:</span>
+            <span class="font-medium" x-text="profile.preferred_difficulty"></span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Стиль языка:</span>
+            <span class="font-medium" x-text="profile.language_style"></span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Среднее время:</span>
+            <span class="font-medium" x-text="(profile.avg_time_per_task||'-') + ' сек'"></span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Темы-табу:</span>
+            <span class="font-medium text-red-600" x-text="(profile.hates_topics||[]).join(', ') || 'нет'"></span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Любит визуалы:</span>
+            <span class="font-medium" x-text="profile.loves_visuals ? 'да' : 'нет'"></span>
+          </div>
+          <div class="flex gap-2">
+            <span class="w-40 text-stone-500">Стиль подсказок:</span>
+            <span class="font-medium" x-text="profile.hint_style"></span>
+          </div>
+        </div>
+        <div class="bg-green-50 rounded-xl p-4 text-sm text-stone-700 border border-green-100">
+          <p class="font-semibold text-green-800 mb-1">✅ Двойник активен</p>
+          <p>Все новые генерации учитывают ваш стиль автоматически.</p>
+          <p class="mt-2 text-xs text-stone-500" x-text="lastTrained ? 'Последнее обучение: ' + lastTrained : ''"></p>
+        </div>
+      </div>
+
+    </div>
+  </template>
+
+</div>
+
+<script>
+function twinApp() {
+  return {
+    profile: null,
+    totalEdits: 0,
+    lastTrained: '',
+    loading: true,
+    training: false,
+    error: '',
+
+    async load() {
+      this.loading = true;
+      const r = await fetch('/profile');
+      const d = await r.json();
+      this.profile = d.profile;
+      this.totalEdits = d.total_edits || 0;
+      this.lastTrained = d.last_trained || '';
+      this.loading = false;
+    },
+
+    async train() {
+      this.training = true;
+      this.error = '';
+      const r = await fetch('/profile/train', { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok) { this.error = d.detail || 'Ошибка'; }
+      else { this.profile = d.profile; }
+      this.training = false;
+    },
+
+    async reset() {
+      if (!confirm('Сбросить профиль двойника?')) return;
+      await fetch('/profile/reset', { method: 'POST' });
+      this.profile = null;
+    },
+  };
+}
+</script>
+{% endblock %}

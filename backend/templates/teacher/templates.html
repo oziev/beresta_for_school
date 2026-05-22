@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Шаблоны — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'templates' %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <header class="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-wrap justify-between gap-3 items-center">
+    <div>
+      <h1 class="text-2xl font-semibold">📚 Шаблоны</h1>
+      <p class="text-stone-500 text-sm">Комплекты, сохранённые как шаблон. Можно использовать как основу для нового урока.</p>
+    </div>
+    <a href="/teacher/create" class="bg-green-700 text-white rounded-xl px-5 py-2.5">+ Создать новый</a>
+  </header>
+
+  <section>
+    {% if templates %}
+      <div class="space-y-3">
+        {% for kit in templates %}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-wrap justify-between gap-4">
+          <div>
+            <h2 class="font-semibold text-lg">{{ kit.template_name or kit.name or kit.topic }}</h2>
+            <p class="text-sm text-stone-500">
+              {{ kit.subject }} · {{ kit.grade }} класс ·
+              {{ kit.lesson_type or 'урок' }} ·
+              {{ kit.items|length }} раздаток
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <a href="/teacher/kits/{{ kit.id }}" class="border rounded-lg px-3 py-1.5">Открыть</a>
+            <button onclick="copyKit('{{ kit.id }}')" class="bg-green-700 text-white rounded-lg px-3 py-1.5">📋 Использовать</button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center text-stone-500">
+        <p class="text-4xl mb-2">📭</p>
+        <p>Шаблонов пока нет.</p>
+        <p class="text-sm mt-1">Откройте любой комплект и нажмите «Сохранить как шаблон».</p>
+      </div>
+    {% endif %}
+  </section>
+
+  {% if templates_legacy %}
+  <section>
+    <h2 class="font-semibold text-stone-700 mb-2">Старые шаблоны параметров (для рабочих листов)</h2>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-2">
+      {% for t in templates_legacy %}
+      <div class="flex justify-between border-b last:border-0 py-1.5">
+        <span>{{ t.name }}</span>
+        <span class="text-xs text-stone-400 font-mono">{{ t.id }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+
+<script>
+async function copyKit(id){
+  const r = await fetch('/kits/'+id+'/copy', {method:'POST'});
+  if (!r.ok) { alert('Не удалось скопировать'); return; }
+  const data = await r.json();
+  location.href = '/teacher/kits/' + data.id;
+}
+</script>
+{% endblock %}

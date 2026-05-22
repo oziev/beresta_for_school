@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: beresta-postgres
+    environment:
+      POSTGRES_USER: beresta
+      POSTGRES_PASSWORD: beresta
+      POSTGRES_DB: beresta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beresta -d beresta"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: beresta-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: beresta-app
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://beresta:beresta@postgres:5432/beresta}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Optional reverse proxy: docker compose --profile nginx up --build
+  nginx:
+    image: nginx:alpine
+    container_name: beresta-nginx
+    profiles: ["nginx"]
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:

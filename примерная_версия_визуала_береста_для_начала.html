@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Beresta Adaptive Pro — Конструктор адаптивных заданий</title>
+    <!-- TailwindCSS + Google Fonts + простые иконки -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: #f7f5f0; }
+        .card-hover { transition: all 0.2s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -12px rgba(0,0,0,0.1); }
+        .qr-preview { background: repeating-linear-gradient(45deg, #2c2c2c 0px, #2c2c2c 2px, #3a3a3a 2px, #3a3a3a 8px); }
+        .adaptive-slider::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; background: #2c5f2d; border-radius: 50%; cursor: pointer; }
+        .tab-active { border-bottom: 3px solid #2c5f2d; color: #2c5f2d; font-weight: 600; }
+        .task-card { transition: all 0.2s; }
+        .task-card:hover { border-left-width: 4px; border-left-color: #2c5f2d; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- ГЛАВНАЯ ШАПКА (единая) -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+        <div class="max-w-7xl mx-auto px-5 py-4 flex justify-between items-center flex-wrap gap-3">
+            <div class="flex items-center gap-2">
+                <span class="text-3xl">🍃</span>
+                <span class="font-bold text-2xl tracking-tight text-stone-800">Beresta <span class="text-green-700">Adaptive Pro</span></span>
+                <span class="ml-3 text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full">Beta AI</span>
+            </div>
+            <div class="flex gap-3 items-center">
+                <button class="text-sm text-stone-600 hover:text-green-700 transition">📘 Примеры</button>
+                <button class="bg-white border border-green-600 text-green-700 px-4 py-1.5 rounded-full text-sm font-medium hover:bg-green-50 transition">🚀 Попробовать</button>
+                <button class="bg-green-700 text-white px-4 py-1.5 rounded-full text-sm font-medium shadow-sm hover:bg-green-800 transition">Войти</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-5 py-8">
+        <!-- ========= ЭКРАН 1: ГЕНЕРАЦИЯ ДЛЯ УЧИТЕЛЯ ========= -->
+        <div class="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden mb-10">
+            <div class="bg-gradient-to-r from-stone-50 to-white px-6 py-5 border-b border-gray-100">
+                <h2 class="text-xl font-semibold text-stone-800 flex items-center gap-2">✨ Создать адаптивный рабочий лист</h2>
+                <p class="text-stone-500 text-sm mt-1">ИИ подстроится под ваш стиль и уровень учеников</p>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- быстрые поля -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-stone-700 mb-1">Тема урока</label>
+                        <input type="text" placeholder="Например: Сравнение дробей, 5 класс" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-stone-700 mb-1">Класс</label>
+                        <select class="w-full border border-gray-300 rounded-xl px-4 py-2.5 bg-white">
+                            <option>5 класс</option><option>6 класс</option><option>7 класс</option><option>8 класс</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-stone-700 mb-1">Предмет</label>
+                        <select class="w-full border border-gray-300 rounded-xl px-4 py-2.5 bg-white">
+                            <option>Математика</option><option>Русский язык</option><option>Физика</option><option>Биология</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- РУЧНАЯ НАСТРОЙКА (раскрывающийся блок) -->
+                <details class="bg-stone-50 rounded-xl p-3 border border-stone-100">
+                    <summary class="cursor-pointer font-medium text-stone-700 flex items-center gap-2 select-none">⚙️ Ручная настройка (количество, типы, сложность)</summary>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="text-sm font-medium">Кол-во заданий: <span id="taskCountValue" class="text-green-700 font-bold">5</span></label>
+                            <input type="range" min="3" max="10" value="5" class="w-full adaptive-slider" id="taskSlider">
+                            <div class="flex gap-3 mt-3 flex-wrap">
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" checked> Тест</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" checked> Задача</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox"> Творческое</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox"> График</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">Распределение сложности</label>
+                            <div class="mt-2 space-y-1"><label class="flex items-center gap-2"><input type="radio" name="diff"> Больше базовых</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="diff" checked> Равномерно</label>
+                            <label class="flex items-center gap-2"><input type="radio" name="diff"> Больше сложных</label></div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">Игровой режим</label>
+                            <div class="mt-2"><label class="flex items-center gap-2"><input type="checkbox"> Добавить сюжет (квест/детектив)</label></div>
+                            <label class="text-sm font-medium mt-3 block">Время на диагностику</label>
+                            <input type="range" min="15" max="90" value="30" class="w-full adaptive-slider">
+                        </div>
+                    </div>
+                </details>
+
+                <div class="flex flex-wrap gap-4 pt-2">
+                    <button class="bg-green-700 hover:bg-green-800 text-white font-medium px-6 py-2.5 rounded-xl shadow-md flex items-center gap-2 transition">✨ Сгенерировать материалы</button>
+                    <button class="border border-gray-300 bg-white px-5 py-2.5 rounded-xl text-stone-700 flex items-center gap-1 hover:bg-gray-50">💾 Сохранить как шаблон</button>
+                    <select class="border border-gray-300 bg-white rounded-xl px-4 py-2.5 text-sm">
+                        <option>📁 Мой стандартный урок</option><option>📁 Для слабого класса</option><option>📁 Олимпиадный стиль</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========= ЭКРАН 2: РЕДАКТОР (результат генерации) ========= -->
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mb-10">
+            <div class="border-b border-gray-100 px-6 py-4 flex justify-between items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold flex items-center gap-2">📄 Дроби: сравнение и сложение · 5 класс</h3>
+                    <p class="text-xs text-stone-400">Сгенерировано 18.05.2025 • 5 заданий • адаптивный режим включён</p>
+                </div>
+                <div class="flex gap-2">
+                    <button class="text-green-700 bg-green-50 px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-1">📱 QR для класса</button>
+                    <button class="border border-gray-300 bg-white px-4 py-1.5 rounded-full text-sm">📊 Предпросмотр</button>
+                </div>
+            </div>
+            <div class="p-5 space-y-4 max-h-[520px] overflow-y-auto">
+                <!-- карточка задания 1 -->
+                <div class="task-card border border-gray-200 rounded-xl p-4 bg-white shadow-sm transition-all">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-2"><span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">Задание 1 • базовый</span><span class="text-xs text-stone-400">⏱️ 30 сек</span></div>
+                        <div class="flex gap-2"><button class="text-stone-500 hover:text-green-600 text-sm">✏️</button><button class="text-stone-500 hover:text-amber-600 text-sm">🔄</button><button class="text-stone-500 hover:text-red-500 text-sm">🗑️</button></div>
+                    </div>
+                    <div class="mt-2 text-stone-800 font-medium">2/4 + 1/4 = ?</div>
+                    <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        <label class="flex items-center gap-2"><input type="radio" name="q1"> A) 1/4</label>
+                        <label class="flex items-center gap-2"><input type="radio" name="q1"> B) 2/4</label>
+                        <label class="flex items-center gap-2"><input type="radio" name="q1"> C) 3/4</label>
+                        <label class="flex items-center gap-2"><input type="radio" name="q1"> D) 1</label>
+                    </div>
+                    <div class="mt-2 text-xs text-stone-400 border-t pt-2 flex justify-between"><span>✅ Правильный ответ: C) 3/4</span><span class="text-green-600 cursor-pointer">✨ Сгенерировать другой вариант</span></div>
+                </div>
+                <!-- карточка задания 2 с адаптивным уровнем (средний) -->
+                <div class="task-card border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div><span class="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">Задание 2 • средний</span><span class="ml-2 text-xs text-stone-400">⏱️ 55 сек</span></div>
+                        <div class="flex gap-2"><button class="text-stone-500">✏️</button><button class="text-stone-500">🔄</button><button class="text-stone-500">🗑️</button></div>
+                    </div>
+                    <div class="mt-2 text-stone-800">Сравните дроби: 3/5 и 2/3. Какая больше?</div>
+                    <div class="mt-2 text-sm italic text-stone-500 bg-stone-50 p-2 rounded">📎 Подсказка: приведите к общему знаменателю 15</div>
+                    <div class="mt-3 flex gap-2"><input type="text" placeholder="Введите ответ" class="border rounded-lg p-2 w-full text-sm"></div>
+                </div>
+                <!-- задание 3 — творческое + игровой элемент -->
+                <div class="task-card border border-green-100 bg-green-50/30 rounded-xl p-4">
+                    <div class="flex justify-between"><span class="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded-full">Задание 3 • творческое + квест</span><button class="text-stone-500 text-sm">✏️</button></div>
+                    <div class="mt-2 font-medium">🧙‍♂️ Помоги магу разделить пиццу: 7/8 и 5/6 — что больше? Напиши рассуждение</div>
+                    <textarea rows="2" placeholder="Творческий ответ..." class="w-full border rounded-lg p-2 mt-2 text-sm"></textarea>
+                    <div class="text-right mt-1 text-xs text-stone-400">✨ [Перегенерировать]</div>
+                </div>
+                <button class="w-full border border-dashed border-gray-300 rounded-xl py-3 text-stone-500 hover:bg-gray-50 transition text-sm mt-2">+ Добавить новое задание</button>
+            </div>
+            <div class="bg-stone-50 px-6 py-3 flex justify-between flex-wrap gap-3 border-t">
+                <div class="flex gap-3"><button class="text-green-700 font-medium">📘 Методическая рефлексия</button><button class="text-stone-600">🔒 Сделать негенерабельным</button></div>
+                <div class="flex gap-3"><button class="bg-green-700 text-white px-5 py-1.5 rounded-full text-sm">📑 PDF для учеников</button><button class="border border-green-600 text-green-700 px-5 py-1.5 rounded-full text-sm">🎭 Маска ответов</button></div>
+            </div>
+        </div>
+
+        <!-- ========= ЭКРАН 3: ДАШБОРД УЧИТЕЛЯ (статистика) ========= -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 mb-10">
+            <div class="px-6 py-4 border-b flex justify-between items-center flex-wrap">
+                <div><h3 class="font-semibold text-lg">📊 Анализ класса: 5А, «Дроби»</h3><p class="text-xs text-stone-400">12 учеников завершили, 4 в процессе</p></div>
+                <button class="text-green-700 bg-green-50 px-3 py-1 rounded-full text-sm">📄 PDF для родителей</button>
+            </div>
+            <div class="p-5 grid md:grid-cols-2 gap-6">
+                <div>
+                    <div class="text-sm font-medium mb-2">❌ Процент ошибок по заданиям</div>
+                    <div class="space-y-2"><div><div class="flex justify-between text-xs"><span>Задание 1 (база)</span><span>15%</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-green-600 h-2 rounded-full w-[15%]"></div></div></div>
+                    <div><div class="flex justify-between text-xs"><span>Задание 2 (средний)</span><span>62%</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-amber-500 h-2 rounded-full w-[62%]"></div></div></div>
+                    <div><div class="flex justify-between text-xs"><span>Задание 3 (творч.)</span><span>48%</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="bg-amber-500 h-2 rounded-full w-[48%]"></div></div></div></div>
+                    <div class="mt-4 text-sm"><span class="font-medium">Распределение уровней:</span> Базовый 42% • Средний 45% • Сложный 13%</div>
+                </div>
+                <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                    <div class="flex items-center gap-2 text-amber-800 font-semibold">🤖 Совет ИИ-методиста</div>
+                    <p class="text-sm text-stone-700 mt-1">«62% класса ошиблись в задании 2 (сравнение дробей). Рекомендуем потратить 10 минут на визуализацию с помощью кругов Эйлера и дать похожие примеры с разными знаменателями».</p>
+                    <button class="text-xs text-green-700 mt-2 underline">Обновить рекомендацию</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========= ЭКРАН 4: АДАПТИВНЫЙ РЕЖИМ ДЛЯ УЧЕНИКА (мобильный стиль) ========= -->
+        <div class="bg-white rounded-2xl shadow-md border border-gray-200 max-w-md mx-auto md:max-w-full">
+            <div class="bg-gradient-to-r from-green-50 to-white rounded-t-2xl px-5 py-4 border-b">
+                <div class="flex justify-between items-center"><span class="text-sm font-medium text-green-800">🧠 Адаптивная диагностика</span><span class="text-xs bg-green-100 px-3 py-1 rounded-full">Ученик: Андрей С.</span></div>
+            </div>
+            <div class="p-5">
+                <div class="flex justify-between text-sm text-stone-500 mb-1"><span>Вопрос 2 из 5</span><span>⏱️ 28 сек</span></div>
+                <div class="w-full bg-gray-200 h-1.5 rounded-full"><div class="bg-green-600 w-2/5 h-1.5 rounded-full"></div></div>
+                <div class="mt-5 text-lg font-medium text-stone-800">Найди 1/2 от 100:</div>
+                <div class="grid grid-cols-2 gap-3 mt-5">
+                    <button class="border rounded-xl py-2.5 text-center bg-white hover:bg-green-50 transition">25</button>
+                    <button class="border rounded-xl py-2.5 text-center bg-white hover:bg-green-50 transition">50</button>
+                    <button class="border rounded-xl py-2.5 text-center bg-white hover:bg-green-50 transition">75</button>
+                    <button class="border rounded-xl py-2.5 text-center bg-white hover:bg-green-50 transition">100</button>
+                </div>
+                <div class="mt-6 text-sm text-stone-400 italic">💡 Подсказка: половина от 100 — это 100 разделить на 2.</div>
+                <button class="w-full mt-5 bg-green-700 text-white py-3 rounded-xl font-medium">Ответить →</button>
+                <div class="text-center text-xs text-stone-400 mt-4">Уровень сложности адаптируется под ваши ответы</div>
+            </div>
+        </div>
+
+        <!-- ========= ЭКРАН 5: ВИРТУАЛЬНЫЙ ДВОЙНИК (профиль учителя) ========= -->
+        <div class="bg-white rounded-2xl border border-gray-200 mt-10">
+            <div class="px-6 py-4 border-b flex justify-between items-center flex-wrap">
+                <div><h3 class="font-semibold flex items-center gap-2">🤖 Мой виртуальный двойник</h3><p class="text-xs text-stone-400">На основе 47 ваших правок</p></div>
+                <button class="text-green-700 border border-green-300 bg-white px-3 py-1 rounded-full text-sm">🔄 Переобучить</button>
+            </div>
+            <div class="p-5 grid md:grid-cols-2 gap-5">
+                <div>
+                    <div class="flex items-center gap-2 text-sm"><span class="w-28">Предпочитаемые типы:</span><span class="font-medium">задачи (56%), тесты (32%)</span></div>
+                    <div class="flex items-center gap-2 text-sm mt-2"><span class="w-28">Стиль формулировок:</span><span class="font-medium">лаконичный, без лишней воды</span></div>
+                    <div class="flex items-center gap-2 text-sm mt-2"><span class="w-28">Темы-табу:</span><span class="font-medium">проценты, масштаб</span></div>
+                    <div class="mt-3 bg-gray-50 p-2 rounded text-xs text-stone-500">✅ Двойник активен: все новые генерации учитывают ваш стиль</div>
+                </div>
+                <div class="border-l pl-5"><div class="text-sm font-medium">Пример влияния:</div><div class="italic text-stone-600 text-sm mt-1">«При генерации ИИ заменил творческое задание на задачу с кратким ответом — согласно вашему профилю»</div>
+                <button class="mt-3 text-green-700 text-sm border border-green-200 px-3 py-1 rounded-full bg-green-50">Сбросить настройки двойника</button></div>
+            </div>
+        </div>
+
+        <!-- QR / дополнительный функциональный блок (для атмосферы) -->
+        <div class="mt-10 bg-stone-50 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 border border-stone-100">
+            <div class="flex items-center gap-3"><div class="w-12 h-12 bg-white border rounded-xl flex items-center justify-center shadow-sm"><span class="text-xl">📱</span></div><div><p class="text-sm font-medium">QR-код к активному уроку</p><p class="text-xs text-stone-500">Ученики сканируют → адаптивный режим</p></div></div>
+            <div class="flex gap-3"><button class="bg-white border px-5 py-2 rounded-xl shadow-sm text-sm">Сгенерировать QR</button><button class="bg-green-700 text-white px-5 py-2 rounded-xl text-sm">Скопировать ссылку для класса</button></div>
+        </div>
+    </main>
+
+    <footer class="text-center text-stone-400 text-xs py-8 border-t mt-8">Beresta Adaptive Pro · ИИ для персонализированного обучения · хакатон «ИИ для образования»</footer>
+
+    <script>
+        // простой динамический слайдер для количества заданий (визуальный эффект)
+        const slider = document.getElementById('taskSlider');
+        const valSpan = document.getElementById('taskCountValue');
+        if(slider && valSpan) slider.addEventListener('input', (e) => valSpan.innerText = e.target.value);
+    </script>
+</body>
+</html>

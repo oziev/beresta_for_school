@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ material.topic }} — рабочий лист (2 колонки)</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 2cm; line-height: 1.4; }
+        h1 { color: #2d6a4f; border-bottom: 3px solid #2d6a4f; padding-bottom: 8px; }
+        .meta { color: #666; font-size: 14px; margin-bottom: 20px; }
+        .tasks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .task { margin-bottom: 20px; page-break-inside: avoid; border-bottom: 1px dashed #ddd; padding-bottom: 10px; }
+        .task-title { font-weight: bold; background: #f0fdf4; padding: 4px 8px; margin-bottom: 6px; border-left: 3px solid #2d6a4f; font-size: 13px; }
+        .task-text { font-size: 13px; margin-bottom: 5px; }
+        .options { margin-left: 15px; font-size: 12px; }
+        .footer { margin-top: 30px; font-size: 11px; color: #999; text-align: center; border-top: 1px solid #eee; padding-top: 8px; }
+        @media print { .tasks-grid { gap: 15px; } }
+    </style>
+</head>
+<body>
+    <h1>{{ material.topic }}</h1>
+    <div class="meta">Класс: {{ material.grade }} | {{ material.subject }} | ⏱️ 2 колонки для экономии бумаги</div>
+
+    <div class="tasks-grid">
+    {% for task in tasks %}
+        <div class="task">
+            <div class="task-title">Задание {{ loop.index }} (ур. {{ task.adaptive_level }})</div>
+            <div class="task-text">{{ task.text | safe }}</div>
+            {% if task.options %}
+            <div class="options">
+                {% for opt in task.options %}
+                <div>□ {{ opt }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+    </div>
+
+    <div class="footer">Beresta Adaptive — ИИ подстраивается под ученика</div>
+</body>
+</html>

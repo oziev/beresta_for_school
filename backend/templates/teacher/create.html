@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Создание материалов — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'create' %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div x-data="createFlow()" x-init="load()" class="space-y-6">
+
+  <section class="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+    <h1 class="text-2xl font-semibold text-stone-800">🍃 Beresta — создание раздаточных материалов</h1>
+    <p class="text-stone-500 mt-1">Выберите тип урока — дальше один из трёх сценариев.</p>
+  </section>
+
+  <section class="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+    <h2 class="font-semibold text-stone-800 mb-4">1. Тип урока</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <template x-for="lt in lessonTypes" :key="lt.id">
+        <button type="button" @click="lessonType=lt.id"
+                class="rounded-2xl border p-4 text-left hover:shadow transition"
+                :class="lessonType===lt.id ? 'border-green-700 bg-green-50' : 'border-gray-200'">
+          <div class="text-3xl" x-text="lt.icon"></div>
+          <div class="font-semibold mt-2" x-text="lt.title"></div>
+          <div class="text-xs text-stone-500 mt-1" x-text="lt.stages.length + ' этапов'"></div>
+        </button>
+      </template>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="font-semibold text-stone-800 mb-3">2. Сценарий</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <a :href="'/teacher/configure-stages?lesson_type='+lessonType"
+         class="block bg-white rounded-2xl shadow-md border border-gray-100 p-6 hover:border-green-600 transition">
+        <div class="text-3xl">🆕</div>
+        <h3 class="font-semibold mt-3">С нуля по ФГОС</h3>
+        <p class="text-sm text-stone-500 mt-1">Конструктор этапов с чекбоксами и таймингом. Рекомендуем.</p>
+      </a>
+      <a :href="'/teacher/create/plan?lesson_type='+lessonType"
+         class="block bg-white rounded-2xl shadow-md border border-gray-100 p-6 hover:border-green-600 transition">
+        <div class="text-3xl">📁</div>
+        <h3 class="font-semibold mt-3">По плану урока</h3>
+        <p class="text-sm text-stone-500 mt-1">Загрузите TXT/PDF/DOCX — ИИ распарсит этапы.</p>
+      </a>
+      <a href="/teacher/templates"
+         class="block bg-white rounded-2xl shadow-md border border-gray-100 p-6 hover:border-green-600 transition">
+        <div class="text-3xl">📚</div>
+        <h3 class="font-semibold mt-3">Из шаблона</h3>
+        <p class="text-sm text-stone-500 mt-1">Возьмите готовый комплект, который вы сохраняли раньше.</p>
+      </a>
+    </div>
+  </section>
+</div>
+
+<script>
+function createFlow(){
+  return {
+    lessonType: 'combined',
+    lessonTypes: [],
+    async load(){
+      const r = await fetch('/lesson-types');
+      const data = await r.json();
+      this.lessonTypes = Object.values(data);
+    }
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<style>
+  body { font-family: DejaVu Sans, sans-serif; font-size: 12pt; color: #1a1a1a; margin: 2cm; }
+  h1 { font-size: 16pt; margin-bottom: 4pt; }
+  .meta { font-size: 10pt; color: #555; margin-bottom: 18pt; }
+  .task { border: 1px solid #ddd; border-radius: 6pt; padding: 10pt; margin-bottom: 12pt; page-break-inside: avoid; }
+  .task-header { font-size: 9pt; color: #777; margin-bottom: 6pt; }
+  .task-text { font-size: 12pt; font-weight: bold; }
+  .options { margin-top: 8pt; display: grid; grid-template-columns: 1fr 1fr; gap: 4pt; }
+  .opt { border: 1px solid #ddd; border-radius: 4pt; padding: 4pt 8pt; font-size: 11pt; }
+  .answer { margin-top: 8pt; font-size: 10pt; color: #555; }
+  footer { text-align: center; font-size: 8pt; color: #aaa; margin-top: 20pt; }
+</style>
+</head>
+<body>
+<h1>{{ material.topic }}</h1>
+<p class="meta">{{ material.grade }} класс · {{ material.subject }}</p>
+{% for task in tasks %}
+<div class="task">
+  <div class="task-header">Задание {{ loop.index }} · уровень {{ task.adaptive_level }} · {{ task.type }}</div>
+  <div class="task-text">{{ task.text }}</div>
+  {% if task.options %}
+  <div class="options">
+    {% for opt in task.options %}
+    <div class="opt">{{ loop.index0 }}) {{ opt }}</div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="margin-top:8pt; border-bottom:1px solid #ccc; height:24pt;"></div>
+  {% endif %}
+  <div class="answer">⏱ {{ task.time_limit_sec }} сек</div>
+</div>
+{% endfor %}
+<footer>Beresta Adaptive Pro · сгенерировано автоматически</footer>
+</body>
+</html>

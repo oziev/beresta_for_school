@@ -1,0 +1,32 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Env
+.env
+.env.local
+
+# Docker
+postgres_data/
+redis_data/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Uploads
+uploads/
+*.tmp
+*.pdf
+*.docx
+*.zip
+
+# Secrets
+*.key
+*.pem

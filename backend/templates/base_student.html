@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{% block title %}Beresta — Ученик{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+  <style>* { font-family: 'Inter', sans-serif; } body { background: #f0fdf4; }</style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="antialiased min-h-screen">
+  <header class="bg-white/90 backdrop-blur border-b border-green-100 sticky top-0 z-20">
+    <div class="max-w-lg mx-auto px-4 py-3 flex items-center justify-center gap-2">
+      <span class="text-2xl">🍃</span>
+      <span class="font-bold text-stone-800">Beresta <span class="text-green-700 text-sm">Ученик</span></span>
+    </div>
+  </header>
+  <main class="max-w-lg mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

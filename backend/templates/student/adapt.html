@@ -1,0 +1,260 @@
+{% extends "base_student.html" %}
+{% block title %}Адаптивное задание — {{ material.topic }}{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto" x-data="adaptApp()" x-init="init()">
+
+  <!-- QR / intro (shown before start) -->
+  <div x-show="phase === 'qr'" class="text-center space-y-4 py-6">
+    <h1 class="text-xl font-bold text-stone-800">🧠 {{ material.topic }}</h1>
+    <p class="text-stone-500 text-sm">{{ material.grade }} класс</p>
+    <img src="data:image/png;base64,{{ qr_b64 }}" alt="QR" class="mx-auto w-48 h-48 rounded-xl border shadow"/>
+    <p class="text-xs text-stone-400">QR-ссылка: <a class="text-green-700 underline" href="{{ qr_url }}">{{ qr_url }}</a></p>
+    <button @click="phase='name'" class="mt-4 w-full bg-green-700 text-white py-3 rounded-xl font-medium">Начать →</button>
+  </div>
+
+  <!-- Name input -->
+  <div x-show="phase === 'name'" class="space-y-4 py-6">
+    <h2 class="text-xl font-bold">Как тебя зовут?</h2>
+    <input class="w-full border rounded-xl px-4 py-3 text-base" x-model="studentName" placeholder="Имя (необязательно)"/>
+    <button @click="startDiagnose()" class="w-full bg-green-700 text-white py-3 rounded-xl font-medium">Поехали!</button>
+  </div>
+
+  <!-- Diagnostic phase -->
+  <div x-show="phase === 'diagnose'" class="space-y-4">
+    <div class="flex justify-between items-center">
+      <span class="text-sm text-stone-500" x-text="`Диагностика: вопрос ${diagIndex+1} из ${diagnostic.length}`"></span>
+      <span class="text-sm font-mono text-red-600" x-show="timer > 0" x-text="`⏱ ${timer} сек`"></span>
+    </div>
+    <div class="w-full bg-gray-200 h-1.5 rounded-full">
+      <div class="bg-green-600 h-1.5 rounded-full transition-all" :style="`width:${((diagIndex)/diagnostic.length)*100}%`"></div>
+    </div>
+    <template x-if="diagnostic[diagIndex]">
+      <div>
+        <p class="text-lg font-medium text-stone-800 mt-4" x-text="diagnostic[diagIndex].text"></p>
+        <div class="grid grid-cols-2 gap-3 mt-5">
+          <template x-for="(opt, oi) in diagnostic[diagIndex].options" :key="oi">
+            <button
+              class="border rounded-xl py-3 text-center bg-white text-stone-800 text-sm font-medium hover:bg-green-50 transition active:scale-95"
+              :class="diagSelected === oi ? 'ring-2 ring-green-500 bg-green-50' : ''"
+              @click="diagSelected = oi"
+              x-text="opt">
+            </button>
+          </template>
+        </div>
+        <button
+          class="w-full mt-5 bg-green-700 text-white py-3 rounded-xl font-medium disabled:opacity-40"
+          :disabled="diagSelected === null"
+          @click="submitDiagAnswer()">Ответить →</button>
+      </div>
+    </template>
+  </div>
+
+  <!-- Diagnosing spinner -->
+  <div x-show="phase === 'diagnosing'" class="py-12 text-center space-y-3">
+    <div class="inline-block w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+    <p class="text-stone-500 text-sm">Определяем ваш уровень…</p>
+  </div>
+
+  <!-- Main task phase -->
+  <div x-show="phase === 'main'" class="space-y-4">
+    <div class="flex justify-between items-center text-sm text-stone-500">
+      <span x-text="`Вопрос ${answeredCount+1} из ${totalTasks}`"></span>
+      <span class="font-mono text-red-600" x-show="timer > 0" x-text="`⏱ ${timer} сек`"></span>
+    </div>
+    <!-- progress bar -->
+    <div class="w-full bg-gray-200 h-1.5 rounded-full">
+      <div class="bg-green-600 h-1.5 rounded-full transition-all" :style="`width:${(answeredCount/totalTasks)*100}%`"></div>
+    </div>
+    <!-- level badge -->
+    <div class="flex items-center gap-2">
+      <span class="text-xs px-2 py-1 rounded-full font-semibold"
+        :class="{
+          'bg-green-100 text-green-800': currentLevel===1,
+          'bg-amber-100 text-amber-800': currentLevel===2,
+          'bg-red-100 text-red-800': currentLevel===3,
+        }"
+        x-text="['','🟢 Базовый','🟡 Средний','🔴 Сложный'][currentLevel]">
+      </span>
+    </div>
+    <template x-if="currentTask">
+      <div>
+        <p class="text-lg font-medium text-stone-800 mt-2" x-text="currentTask.text"></p>
+        <!-- test options -->
+        <template x-if="currentTask.options">
+          <div class="grid grid-cols-2 gap-3 mt-5">
+            <template x-for="(opt, oi) in currentTask.options" :key="oi">
+              <button
+                class="border rounded-xl py-3 text-sm font-medium bg-white text-stone-800 hover:bg-green-50 transition active:scale-95"
+                :class="mainSelected === oi ? 'ring-2 ring-green-500 bg-green-50' : ''"
+                @click="mainSelected = oi"
+                x-text="opt">
+              </button>
+            </template>
+          </div>
+        </template>
+        <!-- open answer -->
+        <template x-if="!currentTask.options">
+          <input class="w-full border rounded-xl px-4 py-3 mt-4 text-base" x-model="openAnswer" placeholder="Введите ответ…"/>
+        </template>
+        <button
+          class="w-full mt-5 bg-green-700 text-white py-3 rounded-xl font-medium disabled:opacity-40"
+          :disabled="mainSelected === null && !openAnswer"
+          @click="submitMainAnswer()">Ответить →</button>
+      </div>
+    </template>
+    <!-- hint modal -->
+    <div x-show="hint" x-transition class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-stone-700">
+      💡 <span x-text="hint"></span>
+    </div>
+  </div>
+
+  <!-- Finished -->
+  <div x-show="phase === 'finished'" class="py-8 text-center space-y-4">
+    <div class="text-5xl">🎉</div>
+    <h2 class="text-xl font-bold" x-text="`Ты решил ${correctCount} из ${totalCount} заданий!`"></h2>
+    <p class="text-stone-600 text-sm">
+      Начальный уровень: <strong x-text="initialLevel"></strong> →
+      Итоговый: <strong x-text="finalLevel"></strong>
+    </p>
+    <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-stone-700" x-show="finalAdvice">
+      🤖 <span x-text="finalAdvice"></span>
+    </div>
+    <a href="/" class="inline-block mt-4 bg-green-700 text-white px-6 py-3 rounded-xl font-medium">На главную</a>
+  </div>
+
+</div>
+
+<script>
+function adaptApp() {
+  return {
+    phase: 'qr',
+    studentName: '',
+    sessionId: '{{ session_id }}',
+    diagnostic: {{ diagnostic | tojson }},
+    diagIndex: 0,
+    diagSelected: null,
+    diagAnswers: [],
+    diagTimestamps: [],
+
+    currentTask: null,
+    currentTaskIndex: null,
+    currentLevel: 2,
+    initialLevel: null,
+    finalLevel: null,
+    mainSelected: null,
+    openAnswer: '',
+    answeredCount: 0,
+    totalTasks: {{ tasks|default(material.tasks)|length }},
+    hint: '',
+    correctCount: 0,
+    totalCount: 0,
+    finalAdvice: '',
+    timer: 0,
+    _timerInterval: null,
+
+    init() {
+      this.phase = 'name';
+      if (!this.diagnostic || this.diagnostic.length === 0) this.phase = 'name';
+    },
+
+    startTimer(seconds) {
+      clearInterval(this._timerInterval);
+      this.timer = seconds;
+      this._timerInterval = setInterval(() => {
+        if (this.timer > 0) this.timer--;
+      }, 1000);
+    },
+
+    startDiagnose() {
+      this.phase = 'diagnose';
+      const q = this.diagnostic[0];
+      if (q) this.startTimer(q.time_sec || 20);
+    },
+
+    async submitDiagAnswer() {
+      clearInterval(this._timerInterval);
+      const q = this.diagnostic[this.diagIndex];
+      const timeSec = q.time_sec || 20;
+      const timeSpent = timeSec - this.timer;
+      this.diagAnswers.push({ answer: this.diagSelected, time_spent: timeSpent });
+      this.diagSelected = null;
+      this.diagIndex++;
+
+      if (this.diagIndex < this.diagnostic.length) {
+        const next = this.diagnostic[this.diagIndex];
+        this.startTimer(next.time_sec || 20);
+      } else {
+        this.phase = 'diagnosing';
+        await this.submitDiagnose();
+      }
+    },
+
+    async submitDiagnose() {
+      const r = await fetch('/adapt/diagnose', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ session_id: this.sessionId, answers: this.diagAnswers }),
+      });
+      const data = await r.json();
+      this.initialLevel = data.initial_level;
+      this.currentLevel = data.initial_level;
+      this.phase = 'main';
+      this.fetchNextTask();
+    },
+
+    fetchNextTask() {
+      const t = window._berestaTasks;
+      if (!t || !t.length) return;
+      // Find first task matching current level
+      let chosen = t.find(tk => tk.adaptive_level === this.currentLevel);
+      if (!chosen) chosen = t[0];
+      const idx = t.indexOf(chosen);
+      this.currentTask = chosen;
+      this.currentTaskIndex = idx;
+      this.startTimer(chosen.time_limit_sec || 30);
+    },
+
+    async submitMainAnswer() {
+      clearInterval(this._timerInterval);
+      const timeSec = this.currentTask.time_limit_sec || 30;
+      const timeSpent = timeSec - this.timer;
+      const answer = this.currentTask.options !== undefined && this.currentTask.options !== null
+        ? this.mainSelected
+        : this.openAnswer;
+
+      const r = await fetch('/adapt/answer', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          session_id: this.sessionId,
+          task_index: this.currentTaskIndex,
+          answer: answer,
+          time_spent: timeSpent,
+        }),
+      });
+      const data = await r.json();
+
+      this.hint = data.hint || '';
+      this.currentLevel = data.new_level;
+      this.answeredCount++;
+      this.mainSelected = null;
+      this.openAnswer = '';
+
+      if (data.is_finished) {
+        window.location.href = '/student/result/' + this.sessionId;
+        return;
+      }
+
+      if (data.next_task !== null && data.next_task !== undefined) {
+        this.currentTask = data.next_task;
+        this.currentTaskIndex = data.next_task_index;
+        this.startTimer(data.next_task.time_limit_sec || 30);
+      }
+    },
+  };
+}
+
+// Inject tasks for first-task bootstrap
+window._berestaTasks = {{ tasks|default(material.tasks) | tojson }};
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Комплект раздаток — {{ kit.topic or kit.subject }}</title>
+  <style>
+    @page { size: {{ export.paper_size }} {{ export.orientation }}; margin: {% if design and design.margins == 'narrow' %}1cm{% elif design and design.margins == 'wide' %}2.5cm{% else %}1.7cm{% endif %}; }
+    body { font-family: '{{ design.font_family if design else 'Inter' }}', Arial, sans-serif; font-size: {{ design.font_size if design else 12 }}pt; color: #1c1917; line-height: 1.45; }
+    h1 { color: #166534; border-bottom: 3px solid #166534; padding-bottom: 8px; }
+    h2 { color: #2f3a2f; margin-bottom: 6px; }
+    .meta { color: #666; margin-bottom: 18px; }
+    .service-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0 22px; font-size: 10pt; }
+    .field { border-bottom: 1px solid #777; min-height: 22px; }
+    .item { page-break-inside: avoid; border: 1px solid #ddd; border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+    .cards_grid .item { width: 45%; display: inline-block; vertical-align: top; min-height: 38%; margin: 1.5%; }
+    .two_cards .item { width: 94%; min-height: 38%; margin: 2% 0; }
+    .flipchart .item { width: 55%; min-height: 90%; border-left: 10px solid #166534; }
+    .combined .item:nth-child(odd) { background: #f0fdf4; }
+    .type { display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 999px; font-size: 9pt; }
+    .level { margin-top: 10px; }
+    .level-title { font-weight: 700; color: #444; }
+    .teacher-only { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px; margin-top: 10px; }
+    .title-page { page-break-after: always; min-height: 80vh; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+    .footer { margin-top: 24px; text-align: center; color: #999; font-size: 9pt; }
+    {% if export.page_numbers %}.footer::after { content: " · стр. " counter(page); }{% endif %}
+  </style>
+</head>
+<body class="{{ export.layout }}">
+  {% if export.title_page %}
+  <section class="title-page">
+    <h1>{{ kit.topic or 'Комплект раздаточных материалов' }}</h1>
+    <div class="meta">{{ kit.subject }} · {{ kit.grade }} класс</div>
+    <p>Версия: {{ 'учительская' if export.version == 'teacher' else 'ученическая' }}</p>
+  </section>
+  {% endif %}
+
+  <h1>{{ kit.topic or 'Комплект раздаточных материалов' }}</h1>
+  <div class="meta">{{ kit.subject }} · {{ kit.grade }} класс · {{ items|length }} материалов</div>
+
+  {% if design and (design.show_date or design.show_name or design.show_class) %}
+  <div class="service-fields">
+    {% if design.show_date %}<div>Дата:<div class="field"></div></div>{% endif %}
+    {% if design.show_name %}<div>Фамилия, имя:<div class="field"></div></div>{% endif %}
+    {% if design.show_class %}<div>Класс:<div class="field"></div></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% for item in items %}
+  <section class="item">
+    <span class="type">{{ item.type }}</span>
+    <h2>{{ item.title }}</h2>
+    <div class="meta">Этап урока: {{ item.stage_name or 'без этапа' }}</div>
+    <div class="level"><div class="level-title">Базовый уровень</div>{{ item.content_levels.basic if item.content_levels.basic is defined else item.content_levels['basic'] }}</div>
+    <div class="level"><div class="level-title">Средний уровень</div>{{ item.content_levels.medium if item.content_levels.medium is defined else item.content_levels['medium'] }}</div>
+    <div class="level"><div class="level-title">Продвинутый уровень</div>{{ item.content_levels.advanced if item.content_levels.advanced is defined else item.content_levels['advanced'] }}</div>
+    {% if export.version == 'teacher' %}
+      {% if item.answer_key %}<div class="teacher-only"><strong>Ответы:</strong> {{ item.answer_key }}</div>{% endif %}
+      {% if item.teacher_notes %}<div class="teacher-only"><strong>Методические заметки:</strong> {{ item.teacher_notes }}</div>{% endif %}
+      {% if item.example_mistakes %}<div class="teacher-only"><strong>Примеры ошибок:</strong> {{ item.example_mistakes }}</div>{% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  {% if export.headers %}<div class="footer">Сгенерировано в Beresta Adaptive Pro</div>{% endif %}
+</body>
+</html>

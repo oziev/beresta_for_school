@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Выбор шаблона — Beresta{% endblock %}
+{% block breadcrumbs %}
+  {% set breadcrumbs = [
+    {'label': 'Выбор шаблона', 'href': None, 'current': True},
+    {'label': 'Настройка заданий', 'href': None, 'current': False},
+    {'label': 'Редактирование', 'href': None, 'current': False},
+    {'label': 'Дашборд', 'href': None, 'current': False},
+  ] %}
+  {% include "partials/breadcrumbs.html" %}
+{% endblock %}
+{% block content %}
+<div x-data="templateSelector()" class="max-w-5xl mx-auto space-y-8">
+
+  <div>
+    <h1 class="text-2xl font-bold text-stone-800">Что вы хотите сделать?</h1>
+    <p class="text-stone-500 text-sm mt-1">Выберите способ начала работы над материалом</p>
+  </div>
+
+  <div class="grid sm:grid-cols-2 gap-4">
+    <button type="button" @click="mode = 'new'"
+            :class="mode === 'new' ? 'ring-2 ring-green-500 bg-green-50 border-green-200' : 'border-gray-200 bg-white hover:border-green-300'"
+            class="p-6 rounded-2xl border-2 text-left transition shadow-sm">
+      <span class="text-4xl block mb-3">✨</span>
+      <span class="font-semibold text-lg text-stone-800">Создать новый лист</span>
+      <span class="text-sm text-stone-500 block mt-1">Выберите формат и настройте задания с нуля</span>
+    </button>
+    <button type="button" @click="mode = 'template'"
+            :class="mode === 'template' ? 'ring-2 ring-green-500 bg-green-50 border-green-200' : 'border-gray-200 bg-white hover:border-green-300'"
+            class="p-6 rounded-2xl border-2 text-left transition shadow-sm">
+      <span class="text-4xl block mb-3">📁</span>
+      <span class="font-semibold text-lg text-stone-800">Мои шаблоны</span>
+      <span class="text-sm text-stone-500 block mt-1">Загрузить сохранённые настройки генерации</span>
+    </button>
+  </div>
+
+  <div x-show="mode === 'new'" x-transition class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b bg-gradient-to-r from-stone-50 to-white">
+      <h2 class="font-semibold text-stone-800">Выберите формат раздаточного материала</h2>
+    </div>
+    <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <template x-for="fmt in formats" :key="fmt.id">
+        <button type="button" @click="selectedFormat = fmt.id"
+                :class="selectedFormat === fmt.id ? 'ring-2 ring-green-500 bg-green-50' : 'hover:shadow-md'"
+                class="rounded-xl border border-gray-200 p-4 text-left transition w-full">
+          <div class="h-24 bg-stone-100 rounded-lg flex items-center justify-center mb-3 text-3xl" x-text="fmt.icon"></div>
+          <p class="font-medium text-stone-800" x-text="fmt.title"></p>
+          <p class="text-xs text-stone-400 mt-1" x-text="fmt.desc"></p>
+        </button>
+      </template>
+    </div>
+  </div>
+
+  <div x-show="mode === 'template'" x-transition class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <h2 class="font-semibold text-stone-800 mb-4">Ваши шаблоны</h2>
+    <div x-show="loading" class="text-stone-400 text-sm">Загрузка…</div>
+    <div x-show="!loading && savedTemplates.length === 0" class="text-stone-400 text-sm py-8 text-center border border-dashed rounded-xl">
+      Шаблонов пока нет. Сохраните настройки после генерации.
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <template x-for="tpl in savedTemplates" :key="tpl.id">
+        <button type="button" @click="selectSavedTemplate(tpl)"
+                class="text-left border rounded-xl p-4 hover:shadow-md hover:border-green-300 transition">
+          <h3 class="font-semibold text-stone-800" x-text="tpl.name"></h3>
+          <p class="text-xs text-stone-400 mt-1 font-mono" x-text="tpl.id"></p>
+        </button>
+      </template>
+    </div>
+  </div>
+
+  <div class="flex gap-3">
+    <a href="/" class="px-5 py-3 rounded-xl border text-stone-600 hover:bg-white transition">← Назад</a>
+    <button type="button" @click="next()" :disabled="!canProceed"
+            class="flex-1 bg-green-700 hover:bg-green-800 disabled:bg-gray-300 text-white font-semibold py-3 rounded-xl transition">
+      Далее → настройка заданий
+    </button>
+  </div>
+</div>
+
+<script>
+function templateSelector() {
+  return {
+    mode: null,
+    selectedFormat: 'classic',
+    savedTemplates: [],
+    loading: false,
+    formats: [
+      {id:'classic', icon:'📄', title:'Классический', desc:'Заголовок + задания списком'},
+      {id:'two-columns', icon:'📰', title:'Две колонки', desc:'Компактно, экономия бумаги'},
+      {id:'infographic', icon:'📊', title:'Инфографика', desc:'Схемы и визуализация'},
+      {id:'cheatsheet', icon:'📖', title:'Памятка', desc:'Правила + примеры'},
+    ],
+    get canProceed() {
+      if (this.mode === 'new') return true;
+      if (this.mode === 'template') return this.savedTemplates.length > 0;
+      return false;
+    },
+    init() {
+      const p = new URLSearchParams(location.search);
+      if (p.get('mode') === 'templates') this.mode = 'template';
+      this.loadTemplates();
+    },
+    async loadTemplates() {
+      this.loading = true;
+      try {
+        const r = await fetch('/templates/my');
+        this.savedTemplates = await r.json();
+      } catch(e) { this.savedTemplates = []; }
+      this.loading = false;
+    },
+    selectSavedTemplate(tpl) {
+      localStorage.setItem('beresta_template_id', tpl.id);
+      window.location.href = '/teacher/generate?template_id=' + tpl.id;
+    },
+    next() {
+      if (this.mode === 'new') {
+        localStorage.setItem('beresta_sheet_format', this.selectedFormat);
+        window.location.href = '/teacher/generate?format=' + this.selectedFormat;
+      } else if (this.mode === 'template' && this.savedTemplates[0]) {
+        this.selectSavedTemplate(this.savedTemplates[0]);
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

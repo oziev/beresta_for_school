@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Комплект раздаток — {{ kit.topic or kit.subject }}{% endblock %}
+{% block breadcrumbs %}
+  {% set current = 'kit' %}
+  {% set kit_id = kit.id %}
+  {% include "partials/teacher_breadcrumbs.html" %}
+{% endblock %}
+{% block head_extra %}
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{% endblock %}
+{% block content %}
+<div x-data="kitEditor('{{ kit.id }}')" x-init="loadDesign()" class="space-y-5">
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+
+    <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-start flex-wrap gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold text-stone-800">📦 Комплект: {{ kit.topic or 'План урока' }}</h1>
+        <p class="text-sm text-stone-500 mt-1">
+          {{ kit.subject }} · {{ kit.grade }} класс · {{ items|length }} раздаток
+          {% if kit.lesson_type %} · {{ kit.lesson_type }}{% endif %}
+          {% if kit.version and kit.version > 1 %} · v{{ kit.version }}{% endif %}
+        </p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button type="button" @click="exportFile('pdf')" class="bg-green-700 text-white px-4 py-2 rounded-full text-sm">📑 PDF</button>
+        <button type="button" @click="exportFile('docx')" class="border border-gray-300 px-4 py-2 rounded-full text-sm">DOCX</button>
+        <button type="button" @click="exportFile('zip')" class="border border-gray-300 px-4 py-2 rounded-full text-sm">ZIP</button>
+        <button type="button" @click="showDesign=!showDesign" class="border border-gray-300 px-4 py-2 rounded-full text-sm hover:bg-gray-50">⚙️ Оформление</button>
+        <a href="/teacher/create" class="border border-gray-300 px-4 py-2 rounded-full text-sm hover:bg-gray-50">+ Новый комплект</a>
+      </div>
+    </div>
+
+    <div class="px-6 py-4 border-b border-gray-100 bg-stone-50 flex flex-wrap gap-2 items-center">
+      <a href="/teacher/kits/{{ kit.id }}/variants" class="border border-green-200 bg-white text-green-800 px-4 py-2 rounded-xl text-sm font-medium hover:border-green-400">🟢🟡🔴 3 варианта</a>
+      <a href="/teacher/adapt/kit/{{ kit.id }}" class="border border-blue-200 bg-white text-blue-800 px-4 py-2 rounded-xl text-sm font-medium hover:border-blue-400">📱 QR для класса</a>
+      <a href="/teacher/dashboard/{{ kit.id }}" class="border border-amber-200 bg-white text-amber-800 px-4 py-2 rounded-xl text-sm font-medium hover:border-amber-400">📊 Дашборд</a>
+      <button type="button" @click="addUngeneratable()" class="border border-stone-200 bg-white px-4 py-2 rounded-xl text-sm hover:bg-stone-100">🔒 + Рукописный элемент</button>
+      <button type="button" @click="loadHotMistakes()" class="border border-stone-200 bg-white px-4 py-2 rounded-xl text-sm hover:bg-stone-100">🔥 Горячая десятка</button>
+      <button type="button" @click="saveAsTemplate()" class="border border-stone-200 bg-white px-4 py-2 rounded-xl text-sm hover:bg-stone-100">📚 В шаблоны</button>
+      <button type="button" @click="forkKit()" class="border border-stone-200 bg-white px-4 py-2 rounded-xl text-sm hover:bg-stone-100">🔄 Форк (после урока)</button>
+      <button type="button" @click="deleteKit()" class="border border-red-200 bg-white text-red-600 px-4 py-2 rounded-xl text-sm hover:bg-red-50 ml-auto">🗑 Удалить комплект</button>
+    </div>
+
+    <div x-show="showDesign" class="bg-stone-50 border-b border-stone-100 px-6 py-5">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+        <label>Шрифт
+          <select x-model="design.font_family" class="mt-1 w-full border rounded-xl px-3 py-2 bg-white">
+            <option>Arial</option><option>Times</option><option>Inter</option><option>Segoe UI</option>
+          </select>
+        </label>
+        <label>Размер
+          <select x-model.number="design.font_size" class="mt-1 w-full border rounded-xl px-3 py-2 bg-white">
+            <template x-for="n in [10,11,12,13,14,15,16]"><option :value="n" x-text="n + ' pt'"></option></template>
+          </select>
+        </label>
+        <label>Поля
+          <select x-model="design.margins" class="mt-1 w-full border rounded-xl px-3 py-2 bg-white">
+            <option value="normal">Нормальные</option><option value="narrow">Узкие</option><option value="wide">Широкие</option>
+          </select>
+        </label>
+        <label>Компоновка
+          <select x-model="exportOptions.layout" class="mt-1 w-full border rounded-xl px-3 py-2 bg-white">
+            <option value="cards_grid">4 карточки на лист</option>
+            <option value="two_cards">2 карточки на лист</option>
+            <option value="flipchart">Флипчарт</option>
+            <option value="full_page">Полностраничный</option>
+            <option value="combined">Комбинированный</option>
+          </select>
+        </label>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-4 text-sm items-center">
+        <label><input type="checkbox" x-model="design.show_date"> Дата</label>
+        <label><input type="checkbox" x-model="design.show_name"> Фамилия, имя</label>
+        <label><input type="checkbox" x-model="design.show_class"> Класс</label>
+        <label><input type="checkbox" x-model="exportOptions.headers"> Колонтитулы</label>
+        <label><input type="checkbox" x-model="exportOptions.title_page"> Титульный лист</label>
+        <label><input type="checkbox" x-model="exportOptions.page_numbers"> Нумерация</label>
+        <select x-model="exportOptions.version" class="border rounded-lg px-2 py-1 bg-white">
+          <option value="student">👨‍🎓 Ученическая</option>
+          <option value="teacher">👩‍🏫 Учительская</option>
+        </select>
+        <select x-model="exportOptions.paper_size" class="border rounded-lg px-2 py-1 bg-white"><option>A4</option><option>A3</option></select>
+        <select x-model="exportOptions.orientation" class="border rounded-lg px-2 py-1 bg-white"><option value="portrait">Портрет</option><option value="landscape">Ландшафт</option></select>
+        <button type="button" @click="saveDesign()" class="text-green-700 font-medium">Сохранить как дефолт</button>
+      </div>
+    </div>
+
+    <div class="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center gap-4">
+      <div class="flex gap-2">
+        <button type="button" @click="showTeacher=true; exportOptions.version='teacher'"
+                :class="showTeacher ? 'bg-green-700 text-white' : 'bg-gray-100'"
+                class="px-4 py-2 rounded-xl text-sm">👩‍🏫 Учительская</button>
+        <button type="button" @click="showTeacher=false; exportOptions.version='student'"
+                :class="!showTeacher ? 'bg-green-700 text-white' : 'bg-gray-100'"
+                class="px-4 py-2 rounded-xl text-sm">👨‍🎓 Ученическая</button>
+      </div>
+      <div class="flex items-center gap-3 ml-auto">
+        <label class="text-sm text-stone-500">🎚️ Глобальная сложность:</label>
+        <input type="range" min="1" max="3" x-model.number="globalComplexity" @change="applyGlobalComplexity()"
+               class="accent-green-700 w-40">
+        <span class="text-sm font-mono w-24" x-text="['Базовый','Средний','Продвинутый'][globalComplexity-1]"></span>
+      </div>
+    </div>
+
+    <div x-show="hotMistakes.length" class="bg-amber-50 border-b border-amber-100 px-6 py-5">
+      <h3 class="font-semibold text-amber-900 mb-2">🔥 Горячая десятка ошибок</h3>
+      <ol class="space-y-2 text-sm">
+        <template x-for="(m,i) in hotMistakes" :key="i">
+          <li class="border border-amber-200 rounded-xl p-3 bg-white">
+            <div class="font-semibold text-amber-900">❌ <span x-text="m.mistake"></span></div>
+            <div class="text-stone-700">✅ <span x-text="m.correct"></span></div>
+            <div class="text-stone-500 text-xs mt-1" x-text="m.why_happens"></div>
+            <div class="text-green-700 text-xs mt-1" x-show="m.lifehack">💡 <span x-text="m.lifehack"></span></div>
+          </li>
+        </template>
+      </ol>
+    </div>
+
+    <div id="items-list" class="p-5 space-y-4">
+      {% for item in items %}
+      <details class="border border-gray-100 rounded-2xl bg-white shadow-sm overflow-hidden" open
+               data-item-id="{{ item.id }}">
+        <summary class="cursor-pointer px-5 py-4 bg-stone-50 flex justify-between items-center gap-3">
+          <span class="flex items-center gap-2">
+            <span class="cursor-grab text-stone-400 select-none" title="Перетащите, чтобы изменить порядок">⋮⋮</span>
+            <span class="font-semibold text-stone-800">{{ item.stage_name or 'Этап' }} · {{ item.title }}</span>
+          </span>
+          <span class="flex items-center gap-2">
+            <span class="text-xs bg-green-100 text-green-800 rounded-full px-2 py-1">{{ item.type }}</span>
+            <button type="button" onclick="event.stopPropagation(); deleteItem('{{ item.id }}')"
+                    class="text-red-600 text-xs hover:underline">удалить</button>
+          </span>
+        </summary>
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-3 gap-4" id="kit-item-{{ item.id }}">
+          {% for level, label in [('basic','Базовый'),('medium','Средний'),('advanced','Продвинутый')] %}
+          <label class="block">
+            <span class="text-sm font-medium text-stone-600">{{ label }} уровень</span>
+            <textarea class="mt-2 w-full min-h-44 border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                      data-level="{{ level }}">{{ item.content_levels[level] }}</textarea>
+          </label>
+          {% endfor %}
+          <label class="lg:col-span-3 block" x-show="showTeacher">
+            <span class="text-sm font-medium text-stone-600">Ответы / критерии (JSON)</span>
+            <textarea class="mt-2 w-full min-h-24 border border-gray-200 rounded-xl p-3 text-sm font-mono"
+                      data-answer-key>{{ item.answer_key|tojson if item.answer_key else '{}' }}</textarea>
+          </label>
+          <label class="lg:col-span-3 block" x-show="showTeacher">
+            <span class="text-sm font-medium text-stone-600">Методические заметки</span>
+            <textarea class="mt-2 w-full min-h-24 border border-gray-200 rounded-xl p-3 text-sm"
+                      data-teacher-notes>{{ item.teacher_notes or '' }}</textarea>
+          </label>
+          <label class="lg:col-span-3 block" x-show="showTeacher">
+            <span class="text-sm font-medium text-stone-600">Пример с ошибками (JSON)</span>
+            <textarea class="mt-2 w-full min-h-24 border border-gray-200 rounded-xl p-3 text-sm font-mono"
+                      data-example-mistakes>{{ item.example_mistakes|tojson if item.example_mistakes else '[]' }}</textarea>
+          </label>
+          <div class="lg:col-span-3 flex justify-between flex-wrap gap-2">
+            <button type="button" onclick="generateExample('{{ item.id }}')"
+                    class="border border-amber-300 text-amber-800 px-4 py-2 rounded-full text-sm hover:bg-amber-50">
+              ✨ ИИ: пример с ошибками
+            </button>
+            <button type="button" @click="saveItem('{{ item.id }}')"
+                    class="bg-stone-800 text-white px-4 py-2 rounded-full text-sm">Сохранить раздатку</button>
+          </div>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+function kitEditor(kitId) {
+  return {
+    showDesign: false,
+    showTeacher: false,
+    globalComplexity: 2,
+    hotMistakes: [],
+    design: {font_family:'Inter', font_size:12, margins:'normal', show_date:true, show_name:true, show_class:true},
+    exportOptions: {layout:'full_page', paper_size:'A4', orientation:'portrait', headers:true, version:'student', title_page:false, page_numbers:false},
+
+    async loadDesign() {
+      const r = await fetch('/design-settings');
+      if (r.ok) this.design = await r.json();
+      this.initSortable();
+    },
+
+    initSortable(){
+      const list = document.getElementById('items-list');
+      if (!list || typeof Sortable === 'undefined') return;
+      Sortable.create(list, {
+        animation: 150,
+        handle: '.cursor-grab',
+        onEnd: async () => {
+          const order = Array.from(list.querySelectorAll('[data-item-id]')).map(el => el.dataset.itemId);
+          await fetch('/kits/' + kitId + '/reorder', {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({order}),
+          });
+        }
+      });
+    },
+
+    async saveDesign() {
+      const r = await fetch('/design-settings', {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(this.design),
+      });
+      alert(r.ok ? 'Настройки сохранены' : 'Не удалось сохранить');
+    },
+
+    async saveItem(itemId) {
+      const root = document.getElementById('kit-item-' + itemId);
+      const levels = {};
+      root.querySelectorAll('textarea[data-level]').forEach(t => levels[t.dataset.level] = t.value);
+      let answer_key = {};
+      let example_mistakes = [];
+      try { answer_key = JSON.parse(root.querySelector('textarea[data-answer-key]')?.value || '{}'); }
+      catch(e) { alert('Некорректный JSON ответов'); return; }
+      try { example_mistakes = JSON.parse(root.querySelector('textarea[data-example-mistakes]')?.value || '[]'); }
+      catch(e) { alert('Некорректный JSON ошибок'); return; }
+      const teacher_notes = root.querySelector('textarea[data-teacher-notes]')?.value || null;
+      const payload = {content_levels: levels, answer_key, example_mistakes, teacher_notes};
+      const r = await fetch('/kit-items/' + itemId, {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) { alert('Ошибка сохранения'); return; }
+      this.flashOk();
+    },
+
+    flashOk(){
+      const toast = document.createElement('div');
+      toast.textContent = '✅ Сохранено';
+      toast.className = 'fixed top-6 right-6 bg-green-700 text-white px-4 py-2 rounded-full shadow-lg z-50';
+      document.body.appendChild(toast);
+      setTimeout(()=>toast.remove(), 1500);
+    },
+
+    async applyGlobalComplexity(){
+      const items = document.querySelectorAll('[data-item-id]');
+      for (const el of items) {
+        const id = el.dataset.itemId;
+        await fetch('/kit-items/' + id, {
+          method:'PUT', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({complexity_level: this.globalComplexity}),
+        });
+      }
+      this.flashOk();
+    },
+
+    async exportFile(kind) {
+      const body = {...this.exportOptions, design:this.design};
+      const endpoint = kind === 'pdf'
+        ? '/export/kit/' + kitId + '/pdf'
+        : '/export/kit/' + kitId + '/' + kind;
+      const opts = kind === 'pdf'
+        ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}
+        : {method:'POST'};
+      const r = await fetch(endpoint, opts);
+      if (!r.ok) { alert('Ошибка экспорта'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'beresta-kit.' + kind; a.click();
+      URL.revokeObjectURL(url);
+    },
+
+    async addUngeneratable(){
+      const r = await fetch('/kits/' + kitId + '/ungeneratable', {method:'POST'});
+      if (!r.ok) { alert('Ошибка'); return; }
+      location.reload();
+    },
+
+    async loadHotMistakes(){
+      const r = await fetch('/kits/' + kitId + '/hot-mistakes', {method:'POST'});
+      if (!r.ok) { alert('LLM недоступен'); return; }
+      const data = await r.json();
+      this.hotMistakes = data.mistakes || [];
+    },
+
+    async saveAsTemplate(){
+      const name = prompt('Название шаблона:', 'Мой шаблон');
+      if (!name) return;
+      const r = await fetch('/kits/' + kitId + '/template', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({template_name: name}),
+      });
+      alert(r.ok ? 'Сохранено как шаблон' : 'Ошибка');
+    },
+
+    async forkKit(){
+      const note = prompt('Короткий комментарий по проведённому уроку (что улучшить):', '');
+      const body = {ratings:{}, comments:{}, general_comment: note || ''};
+      const r = await fetch('/kits/' + kitId + '/fork', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) { alert('Не удалось форкнуть'); return; }
+      const data = await r.json();
+      location.href = '/teacher/kits/' + data.id;
+    },
+
+    async deleteKit(){
+      if (!confirm('Удалить весь комплект?')) return;
+      const r = await fetch('/kits/' + kitId, {method:'DELETE'});
+      if (r.ok) location.href = '/teacher/kits';
+      else alert('Ошибка удаления');
+    },
+  };
+}
+
+async function deleteItem(id){
+  if (!confirm('Удалить раздатку?')) return;
+  const r = await fetch('/kit-items/' + id, {method:'DELETE'});
+  if (r.ok) location.reload();
+  else alert('Ошибка');
+}
+
+async function generateExample(id){
+  const r = await fetch('/kit-items/' + id + '/generate-example', {method:'POST'});
+  if (!r.ok) { alert('LLM недоступен'); return; }
+  const data = await r.json();
+  if (data.examples && data.examples.length) {
+    const root = document.getElementById('kit-item-' + id);
+    const ta = root.querySelector('textarea[data-example-mistakes]');
+    if (ta) ta.value = JSON.stringify(data.examples, null, 2);
+    alert('Сгенерировано примеров: ' + data.examples.length);
+  } else {
+    alert('Не получилось сгенерировать пример');
+  }
+}
+</script>
+{% endblock %}

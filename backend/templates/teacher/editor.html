@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Редактор — {{ material.topic }}{% endblock %}
+{% block breadcrumbs %}
+  {% set breadcrumbs = [
+    {'label': 'Выбор шаблона', 'href': '/teacher/select-template', 'current': False},
+    {'label': 'Настройка заданий', 'href': '/teacher/generate', 'current': False},
+    {'label': 'Редактирование', 'href': None, 'current': True},
+    {'label': 'Дашборд', 'href': '/teacher/dashboard/' ~ material.id|string, 'current': False},
+  ] %}
+  {% include "partials/breadcrumbs.html" %}
+{% endblock %}
+{% block header_extra %}
+  <a href="/adapt/{{ material.id }}" class="text-green-700 bg-green-50 px-3 py-1.5 rounded-full text-sm font-medium">📱 QR класс</a>
+{% endblock %}
+{% block content %}
+<div class="space-y-4">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div class="border-b border-gray-100 px-6 py-4 flex justify-between items-center flex-wrap gap-3">
+      <div>
+        <h1 class="text-xl font-semibold">📄 {{ material.topic }} · {{ material.grade }} класс</h1>
+        <p class="text-xs text-stone-400 mt-0.5">{{ material.subject }} · {{ tasks|length }} заданий</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="/teacher/dashboard/{{ material.id }}" class="border border-gray-300 bg-white px-4 py-1.5 rounded-full text-sm hover:bg-gray-50">📊 Дашборд</a>
+        <a href="/export/pdf/{{ material.id }}?mode=worksheet" class="bg-green-700 text-white px-4 py-1.5 rounded-full text-sm">📑 PDF</a>
+        <button type="button" onclick="makeUngeneratable('{{ material.id }}')" class="border px-4 py-1.5 rounded-full text-sm hover:bg-gray-50">🔒 Негенерабельно</button>
+        <a href="/reflection/{{ material.id }}" class="text-green-700 border border-green-200 px-4 py-1.5 rounded-full text-sm">📘 Методичка</a>
+      </div>
+    </div>
+    <div id="tasks" class="p-5 space-y-4 max-h-[680px] overflow-y-auto">
+      {% for task in tasks %}
+        {% with material_id=material.id, idx=loop.index0 %}
+          {% include "partials/task_view.html" %}
+        {% endwith %}
+      {% endfor %}
+    </div>
+    <div class="bg-stone-50 px-6 py-3 border-t">
+      <button type="button" onclick="alert('Добавьте задание через PUT /materials/{{ material.id }}')"
+              class="w-full border border-dashed border-gray-300 rounded-xl py-3 text-stone-500 text-sm hover:bg-white">
+        + Добавить задание
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+async function regenerateTask(materialId, idx) {
+  const r = await fetch('/generate/task', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({material_id: materialId, task_index: idx})});
+  if (!r.ok) { alert('Ошибка перегенерации'); return; }
+  htmx.ajax('GET', `/materials/${materialId}/htmx/tasks/${idx}/view`, {target:`#task-${idx}`, swap:'outerHTML'});
+}
+async function makeUngeneratable(id) {
+  const r = await fetch(`/materials/${id}/ungeneratable`, {method:'POST'});
+  if (r.ok) location.reload(); else alert('Ошибка');
+}
+</script>
+{% endblock %}
