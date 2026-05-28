@@ -33,6 +33,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: beresta-app
+    env_file:
+      - .env                    # ← ЗАГРУЖАЕМ ВСЕ ПЕРЕМЕННЫЕ ИЗ .env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://beresta:beresta@postgres:5432/beresta}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}

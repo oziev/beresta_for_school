@@ -1,3 +1,5 @@
+"""API endpoints for kits (lesson plans, kit generation, export)."""
+
 from __future__ import annotations
 
 import io
@@ -148,17 +150,22 @@ def _fallback_parse_stages(text: str) -> list[LessonStage]:
 VALID_HANDOUT_TYPES = {"cards", "worksheet", "memo", "reflection", "table", "schema", "homework"}
 
 
+def _fix_recommended_handout_type(stage: dict[str, Any]) -> dict[str, Any]:
+    """Исправляет пустое или невалидное значение recommended_handout_type."""
+    valid_types = {"cards", "worksheet", "memo", "reflection", "table", "schema", "homework"}
+    value = stage.get("recommended_handout_type", "worksheet")
+    if not value or value not in valid_types:
+        stage["recommended_handout_type"] = "worksheet"
+    return stage
+
+
 def _normalize_items(
     data: dict[str, Any],
     stages: list[LessonStage],
     *,
     global_complexity: int = 2,
 ) -> list[dict[str, Any]]:
-    """Парсит ответ LLM в нормализованные элементы комплекта.
-
-    Если LLM не вернул items — генерируем заглушки по этапам (но всегда
-    с реальными типами раздаток из плана).
-    """
+    """Парсит ответ LLM в нормализованные элементы комплекта."""
     raw_items = data.get("items")
     enabled_stages = [s for s in stages if s.needs_handout]
     if not isinstance(raw_items, list) or not raw_items:
@@ -171,9 +178,9 @@ def _normalize_items(
                     "type": handout,
                     "title": f"Раздатка: {stage.name}",
                     "content_levels": {
-                        "basic": f"Базовый материал для этапа «{stage.name}» (заглушка LLM).",
-                        "medium": f"Средний материал для этапа «{stage.name}» (заглушка LLM).",
-                        "advanced": f"Продвинутый материал для этапа «{stage.name}» (заглушка LLM).",
+                        "basic": f"Базовое задание по теме «{stage.name}».",
+                        "medium": f"Среднее задание по теме «{stage.name}».",
+                        "advanced": f"Продвинутое задание по теме «{stage.name}».",
                     },
                 }
             )
@@ -182,16 +189,31 @@ def _normalize_items(
         levels = item.get("content_levels") if isinstance(item, dict) else None
         if not isinstance(levels, dict):
             levels = {}
+        
+        # Исправление: если уровень пустой — подставляем заглушку
+        basic = levels.get("basic")
+        medium = levels.get("medium")
+        advanced = levels.get("advanced")
+        
+        stage_name = item.get("stage_name") or f"Этап {idx + 1}"
+        
+        if not basic or not str(basic).strip():
+            basic = f"Базовое задание: что вы узнали на этапе «{stage_name}»?"
+        if not medium or not str(medium).strip():
+            medium = f"Среднее задание: приведите пример по теме «{stage_name}»."
+        if not advanced or not str(advanced).strip():
+            advanced = f"Продвинутое задание: проанализируйте и сделайте вывод по теме «{stage_name}»."
+        
         content_levels = ContentLevels(
-            basic=str(levels.get("basic") or "Базовый вариант материала"),
-            medium=str(levels.get("medium") or "Средний вариант материала"),
-            advanced=str(levels.get("advanced") or "Продвинутый вариант материала"),
+            basic=str(basic),
+            medium=str(medium),
+            advanced=str(advanced),
         )
+        
         item_type = (item.get("type") or "worksheet").strip().lower()
         if item_type not in VALID_HANDOUT_TYPES:
             item_type = "worksheet"
         answer_key = item.get("answer_key") if isinstance(item.get("answer_key"), dict) else None
-        # Собираем доп. поля в example_mistakes (там у нас единое поле для всех "приписок")
         extras: list[dict[str, Any]] = []
         raw_mistakes = item.get("example_mistakes")
         if isinstance(raw_mistakes, list):
@@ -204,7 +226,7 @@ def _normalize_items(
             extras.append({"kind": "sources", "items": [s for s in sources if isinstance(s, dict)][:5]})
         normalized.append(
             {
-                "stage_name": item.get("stage_name") or f"Этап {idx + 1}",
+                "stage_name": stage_name,
                 "type": item_type,
                 "title": item.get("title") or f"Раздатка {idx + 1}",
                 "content_levels": content_levels.model_dump(mode="json"),
@@ -217,7 +239,6 @@ def _normalize_items(
             }
         )
     return normalized
-
 
 async def _load_teacher_profile(db: AsyncSession) -> dict[str, Any] | None:
     """Подгружает профиль виртуального двойника учителя, если он активен."""
@@ -263,7 +284,16 @@ async def _parse_stages_with_llm(text: str, llm: GigaChatClient, redis: Any) -> 
         await cache_set(redis, key, raw, get_settings().llm_cache_ttl_sec)
     try:
         data = extract_json_object(raw)
-        stages = [LessonStage.model_validate(x) for x in data.get("stages", [])]
+        stages_data = data.get("stages", [])
+        stages = []
+        for stage_data in stages_data:
+            if isinstance(stage_data, dict):
+                stage_data = _fix_recommended_handout_type(stage_data)
+                try:
+                    stages.append(LessonStage.model_validate(stage_data))
+                except ValidationError as e:
+                    log.warning(f"Stage validation error: {e}, using fallback")
+                    stages.append(_default_stage_from_line(stage_data.get("name", ""), len(stages)))
         return stages or _fallback_parse_stages(text)
     except (ValueError, ValidationError, json.JSONDecodeError) as exc:
         log.error("Invalid lesson plan JSON: %s", exc)
@@ -457,7 +487,6 @@ async def generate_from_scratch(
 
 @router.get("/kits", response_model=list[KitRead])
 async def list_kits(db: Annotated[AsyncSession, Depends(get_session)]) -> list[KitRead]:
-    """Список всех комплектов (JSON). HTML-страница — на /teacher/kits."""
     res = await db.execute(select(Kit).options(selectinload(Kit.items)).order_by(Kit.created_at.desc()).limit(100))
     return [KitRead.model_validate(kit) for kit in res.scalars().all()]
 
@@ -581,7 +610,6 @@ async def reorder_kit_items(
     body: KitItemReorderRequest,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
-    """Drag-and-drop переупорядочивание элементов комплекта."""
     kit = await _get_kit_or_404(db, kit_id)
     item_by_id = {item.id: item for item in kit.items}
     if set(body.order) != set(item_by_id):
@@ -597,7 +625,6 @@ async def kit_ungeneratable(
     kit_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> dict[str, Any]:
-    """Добавить «рукописный» (негенерабельный) элемент в комплект."""
     kit = await _get_kit_or_404(db, kit_id)
     sort_order = max((item.sort_order or 0) for item in kit.items) + 1 if kit.items else 0
     placeholder = ContentLevels(
@@ -630,7 +657,6 @@ async def kit_hot_mistakes(
     db: Annotated[AsyncSession, Depends(get_session)],
     llm: Annotated[GigaChatClient, Depends(get_llm)],
 ) -> dict[str, Any]:
-    """Промпт №11 (US-12) — генерирует «Горячую десятку» ошибок для комплекта."""
     kit = await _get_kit_or_404(db, kit_id)
     redis = get_redis(request)
     prompt = prompt_hot_mistakes(topic=kit.topic or "урок", grade=kit.grade, subject=kit.subject, count=10)
@@ -662,7 +688,6 @@ async def generate_item_example(
     db: Annotated[AsyncSession, Depends(get_session)],
     llm: Annotated[GigaChatClient, Depends(get_llm)],
 ) -> dict[str, Any]:
-    """Промпт №12 (US-16) — добавить пример с типичными ошибками к раздатке."""
     res = await db.execute(select(KitItem).where(KitItem.id == item_id))
     item = res.scalar_one_or_none()
     if item is None:
@@ -881,7 +906,6 @@ async def export_kit_pdf_alias(
 
 @router.post("/export/kit/{kit_id}/docx")
 async def export_kit_docx(kit_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_session)]) -> Response:
-    """DOCX-экспорт с настоящими таблицами Word под каждый уровень."""
     kit = await _get_kit_or_404(db, kit_id)
     try:
         from docx import Document
@@ -944,7 +968,6 @@ async def export_kit_zip(
     kit_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_session)],
 ) -> Response:
-    """ZIP с папками по этапам + PDF (если доступен WeasyPrint) + answers JSON."""
     import zipfile
 
     kit = await _get_kit_or_404(db, kit_id)

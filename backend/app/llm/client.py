@@ -45,7 +45,11 @@ class GigaChatClient:
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
-        self._http = httpx.AsyncClient(timeout=httpx.Timeout(self.settings.llm_timeout_sec))
+        # Отключаем проверку SSL для локальной разработки (самоподписанный сертификат GigaChat)
+        self._http = httpx.AsyncClient(
+            timeout=httpx.Timeout(self.settings.llm_timeout_sec),
+            verify=False  # ← ДЛЯ САМОПОДПИСАННОГО СЕРТИФИКАТА GigaChat
+        )
         self._access_token: str | None = None
         self._access_token_expires_at: float = 0.0
 
@@ -72,9 +76,17 @@ class GigaChatClient:
             "scope": self.settings.gigachat_scope,
             "grant_type": "client_credentials",
         }
-        resp = await self._http.post(self.settings.gigachat_oauth_url, headers=headers, data=data)
-        resp.raise_for_status()
-        payload = resp.json()
+        
+        # Используем отдельный клиент с verify=False для OAuth запроса
+        async with httpx.AsyncClient(verify=False) as client:
+            resp = await client.post(
+                self.settings.gigachat_oauth_url, 
+                headers=headers, 
+                data=data
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            
         token = payload.get("access_token")
         if not token:
             log.error("GigaChat OAuth response missing access_token: %s", payload)
@@ -106,10 +118,24 @@ class GigaChatClient:
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        
+        # System prompt для стабильного JSON
+        system_prompt = """Ты — ИИ-ассистент учителя.
+ПРАВИЛА:
+1. Возвращай ТОЛЬКО валидный JSON
+2. Без пояснений, без markdown, без ```json
+3. Не используй общие фразы типа "базовый вариант материала"
+4. Каждое задание должно быть конкретным и содержательным
+5. Начинай с { и заканчивай }"""
+        
         body: dict[str, Any] = {
             "model": self.settings.gigachat_model,
-            "messages": [{"role": "user", "content": user_prompt}],
-            "temperature": 0.35,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.3,  # понижено для стабильности JSON
+            "max_tokens": 2500,
         }
 
         last_exc: Exception | None = None
@@ -133,12 +159,14 @@ class GigaChatClient:
                 if not isinstance(content, str) or not content.strip():
                     log.error("GigaChat empty content: %s", data)
                     raise GigaChatError("Empty message content")
+                
+                log.debug(f"LLM response length: {len(content)} chars")
                 return content
             except (httpx.TimeoutException, httpx.TransportError) as exc:
-                log.error("GigaChat transport/timeout error: %s", exc)
+                log.error("GigaChat transport/timeout error (attempt %d): %s", attempt, exc)
                 last_exc = exc
             except httpx.HTTPStatusError as exc:
-                log.error("GigaChat HTTP error: %s", exc)
+                log.error("GigaChat HTTP error (attempt %d): %s", attempt, exc)
                 last_exc = exc
 
         assert last_exc is not None
@@ -146,87 +174,157 @@ class GigaChatClient:
 
     def _stub_completion(self, user_prompt: str) -> str:
         """Deterministic JSON for local runs when API keys are absent or stub mode is on."""
-        # Very small heuristic: if prompt asks for single task JSON, return one task
-        if '"text"' in user_prompt and "альтернативный вариант" in user_prompt:
-            task = {
-                "text": "Демо-задание (stub): вычислите 12 + 15.",
-                "options": ["25", "27", "28", "30"],
-                "correct": 1,
-                "time_limit_sec": 30,
-                "adaptive_level": 2,
-                "type": "test",
-            }
-            return json.dumps(task, ensure_ascii=False)
-        if "диагност" in user_prompt.lower():
-            demo = {
-                "diagnostic": [
+        prompt_lower = user_prompt.lower()
+        
+        # Литература
+        if "литература" in prompt_lower or "литератур" in prompt_lower:
+            if "онегин" in prompt_lower or "пушкин" in prompt_lower:
+                return json.dumps({
+                    "tasks": [
+                        {
+                            "text": "Назови главного героя романа 'Евгений Онегин'. Какие черты его характера проявляются в первой главе?",
+                            "options": None,
+                            "correct": "Евгений Онегин, разочарование, скука, эгоизм",
+                            "time_limit_sec": 60,
+                            "adaptive_level": 1,
+                            "type": "open"
+                        },
+                        {
+                            "text": "Почему Онегин отверг любовь Татьяны? Приведи 2 причины из текста.",
+                            "options": None,
+                            "correct": "1) Боязнь семейной жизни, 2) Ценил свободу, 3) Пресыщенность",
+                            "time_limit_sec": 90,
+                            "adaptive_level": 2,
+                            "type": "open"
+                        },
+                        {
+                            "text": "Сравни образы Онегина и Ленского. В чём их противопоставление помогает раскрыть замысел Пушкина?",
+                            "options": None,
+                            "correct": "Онегин — 'лишний человек', Ленский — романтик. Их дуэль показывает трагедию поколения",
+                            "time_limit_sec": 120,
+                            "adaptive_level": 3,
+                            "type": "open"
+                        }
+                    ]
+                }, ensure_ascii=False)
+            return json.dumps({
+                "tasks": [
                     {
-                        "text": "Stub: что такое дробь?",
-                        "options": ["часть целого", "только числитель", "только знаменатель", "целое число"],
-                        "correct": 0,
-                        "time_sec": 10,
+                        "text": "Назови автора и главного героя произведения.",
+                        "options": None,
+                        "correct": "Ответ должен содержать имя автора и героя",
+                        "time_limit_sec": 45,
+                        "adaptive_level": 1,
+                        "type": "open"
                     },
                     {
-                        "text": "Stub: сложите 1/2 и 1/4",
-                        "options": ["1/6", "2/4", "3/4", "1"],
-                        "correct": 2,
-                        "time_sec": 15,
+                        "text": "Какая основная проблема поднимается в произведении? Приведи пример из текста.",
+                        "options": None,
+                        "correct": "Проблема + цитата/пример",
+                        "time_limit_sec": 90,
+                        "adaptive_level": 2,
+                        "type": "open"
                     },
                     {
-                        "text": "Stub: какая дробь больше: 3/5 или 2/3?",
-                        "options": ["3/5", "2/3", "равны", "нельзя сравнить"],
-                        "correct": 1,
-                        "time_sec": 20,
-                    },
+                        "text": "Проанализируй образ главного героя. Какие средства художественной выразительности использует автор?",
+                        "options": None,
+                        "correct": "Анализ с примерами тропов и фигур",
+                        "time_limit_sec": 120,
+                        "adaptive_level": 3,
+                        "type": "open"
+                    }
                 ]
-            }
-            return json.dumps(demo, ensure_ascii=False)
-        if "совет учителю" in user_prompt.lower() or '"advice"' in user_prompt:
-            return json.dumps({"advice": "Stub: повторите базовые определения и разберите 2 типовых ошибки на доске."}, ensure_ascii=False)
-        if "методист" in user_prompt.lower() or "strengths" in user_prompt:
-            return json.dumps(
+            }, ensure_ascii=False)
+        
+        # Генерация заданий (общий случай)
+        if "сгенерируй" in prompt_lower and "заданий" in prompt_lower:
+            m = re.search(r"Сгенерируй\s+(\d+)\s+задан", user_prompt)
+            n = int(m.group(1)) if m else 5
+            n = max(3, min(10, n))
+            tm = re.search(r"теме\s+\"([^\"]+)\"", user_prompt)
+            topic = tm.group(1) if tm else "тема"
+            tasks = []
+            for i in range(n):
+                level = (i % 3) + 1
+                if level == 1:
+                    text = f"Задание {i+1} (базовый): Что такое {topic}? Приведи определение."
+                elif level == 2:
+                    text = f"Задание {i+1} (средний): Объясни, как применять {topic} на практике. Приведи пример."
+                else:
+                    text = f"Задание {i+1} (продвинутый): Проанализируй {topic}. В чём его значение? Приведи аргументы."
+                tasks.append({
+                    "text": text,
+                    "options": None,
+                    "correct": "Развёрнутый ответ",
+                    "time_limit_sec": 30 + i * 10,
+                    "adaptive_level": level,
+                    "type": "open" if level > 1 else "test",
+                })
+            return json.dumps({"tasks": tasks}, ensure_ascii=False)
+        
+        # Диагностика
+        if "диагност" in prompt_lower:
+            return json.dumps({
+                "diagnostic": [
+                    {"text": "Что вы уже знаете по этой теме? Напишите 2-3 предложения.", "options": None, "correct": "Любой связный ответ", "time_sec": 30},
+                    {"text": "Какие вопросы у вас возникают при изучении этой темы?", "options": None, "correct": "Любой содержательный вопрос", "time_sec": 30},
+                    {"text": "Что бы вы хотели узнать сегодня на уроке?", "options": None, "correct": "Любая учебная цель", "time_sec": 30}
+                ]
+            }, ensure_ascii=False)
+        
+        # Совет учителю
+        if "совет" in prompt_lower and "учителю" in prompt_lower:
+            return json.dumps({
+                "advice": "Рекомендуется начать с повторения базовых понятий, затем перейти к практическим заданиям. Уделите внимание типичным ошибкам."
+            }, ensure_ascii=False)
+        
+        # Методическая рефлексия
+        if "методист" in prompt_lower or "рефлексия" in prompt_lower:
+            return json.dumps({
+                "strengths": "Задания охватывают ключевые аспекты темы, есть дифференциация по сложности.",
+                "pitfalls": "Ученики могут путать основные понятия. Рекомендуется добавить визуальные опоры.",
+                "next_lesson": "Закрепить материал на практических примерах, добавить работу в парах.",
+                "time_estimate": "Слабые: 25 мин, Средние: 15 мин, Сильные: 10 мин"
+            }, ensure_ascii=False)
+        
+        # Для комплекта раздаток
+        if "комплект" in prompt_lower or "kit" in prompt_lower:
+            return json.dumps({
+                "items": [
+                    {
+                        "stage_name": "Актуализация знаний",
+                        "type": "cards",
+                        "title": "Карточки для разминки",
+                        "content_levels": {
+                            "basic": "Что такое [тема]? Дай определение.",
+                            "medium": "Приведи пример использования [темы].",
+                            "advanced": "Сравни [тему] с похожими понятиями. В чём разница?"
+                        },
+                        "complexity_level": 2,
+                        "teacher_notes": "Обрати внимание на понимание базовых определений",
+                        "answer_key": {"basic": "Определение", "medium": "Пример", "advanced": "Сравнение"}
+                    }
+                ]
+            }, ensure_ascii=False)
+        
+        # Подсказка
+        if "подсказк" in prompt_lower and "hint" in prompt_lower:
+            return json.dumps({"hint": "Вспомните основное правило по этой теме."}, ensure_ascii=False)
+        
+        # Финальный совет ученику
+        if "совет" in prompt_lower and "ученик" in prompt_lower:
+            return json.dumps({"advice": "Повторите основные определения и выполните несколько практических заданий."}, ensure_ascii=False)
+        
+        # Default fallback
+        return json.dumps({
+            "tasks": [
                 {
-                    "strengths": "Stub: логичная последовательность заданий.",
-                    "pitfalls": "Stub: путаница со знаменателем при сложении.",
-                    "next_lesson": "Stub: визуализация на кругах и 5 минут устной работы.",
-                    "time_estimate": "Stub: слабые 25 мин / средние 15 / сильные 10",
-                },
-                ensure_ascii=False,
-            )
-        if "анализируй" in user_prompt.lower() and "правок" in user_prompt.lower():
-            return json.dumps(
-                {
-                    "preferred_difficulty": "medium",
-                    "preferred_task_types": ["test", "problem"],
-                    "avg_time_per_task": 45,
-                    "language_style": "friendly",
-                    "hates_topics": [],
-                    "loves_visuals": True,
-                    "hint_style": "example_first",
-                },
-                ensure_ascii=False,
-            )
-        if "подсказку" in user_prompt.lower() and '"hint"' in user_prompt:
-            return json.dumps({"hint": "Stub: вспомните определение и проверьте знаменатель."}, ensure_ascii=False)
-        if "персонализированный совет" in user_prompt.lower():
-            return json.dumps({"advice": "Stub: повторите тему на простых числовых примерах."}, ensure_ascii=False)
-
-        # Default: full sheet
-        m = re.search(r"Сгенерируй\s+(\d+)\s+задан", user_prompt)
-        n = int(m.group(1)) if m else 5
-        n = max(3, min(10, n))
-        tm = re.search(r"теме\s+\"([^\"]+)\"", user_prompt)
-        topic = tm.group(1) if tm else "тема"
-        tasks = []
-        for i in range(n):
-            tasks.append(
-                {
-                    "text": f"Stub {i + 1}: задание по теме «{topic}».",
-                    "options": ["вариант A", "вариант B", "вариант C", "вариант D"],
-                    "correct": i % 4,
-                    "time_limit_sec": 30,
-                    "adaptive_level": (i % 3) + 1,
-                    "type": "test",
-                },
-            )
-        return json.dumps({"tasks": tasks}, ensure_ascii=False)
+                    "text": "Демо-задание: объясните основную идею темы.",
+                    "options": None,
+                    "correct": "Развёрнутый ответ",
+                    "time_limit_sec": 60,
+                    "adaptive_level": 2,
+                    "type": "open"
+                }
+            ]
+        }, ensure_ascii=False)

@@ -1,4 +1,4 @@
-"""Eight GigaChat prompt templates from ТЗ §8 (Python f-strings / builders)."""
+
 
 from __future__ import annotations
 
@@ -99,42 +99,87 @@ def prompt_generate_sheet(
 ) -> str:
     """Промпт №1: полная генерация листа."""
     p = params
-    return f"""Ты — опытный педагог по {subject}, {grade} класс.
+    
+    # Предупреждение о соответствии предмету
+    subject_warning = ""
+    if subject.lower() == "литература":
+        subject_warning = """
+⚠️ ВАЖНО: Предмет — ЛИТЕРАТУРА. Задания ДОЛЖНЫ быть по литературе:
+- анализ текста, характеристика героев, работа с цитатами, сюжет, композиция
+- ЗАПРЕЩЕНЫ математические, физические или другие нелитературные темы
+- НЕ используй слова: дробь, числитель, знаменатель, уравнение, вычисление
 
-Сгенерируй {p.task_count} заданий по теме "{topic}" с параметрами:
-- Типы заданий: {_types_str(p.task_types)} (например, тест, открытый вопрос, задача, творческое)
-- Распределение сложности: {p.difficulty_distribution} (равномерно/больше базовых/больше сложных)
-- Формат ответа: {p.answer_format} (тест/открытый текст/смешанный)
-- Время на диагностику (контекст урока): {p.diagnostic_time_sec} сек
+❌ ПЛОХО: "простые вопросы по прочитанным произведениям"
+✅ ХОРОШО: "Назови главного героя повести. Какая проблема его волнует?"
+
+❌ ПЛОХО: "задания средней сложности на понимание темы"
+✅ ХОРОШО: "Объясни, почему автор использует метафору 'мёртвые души'?"
+"""
+    elif subject.lower() == "русский":
+        subject_warning = """
+⚠️ ВАЖНО: Предмет — РУССКИЙ ЯЗЫК. Задания должны быть по русскому языку:
+- правила орфографии, пунктуации, работа с текстом, анализ предложений
+- НЕ используй математические темы
+
+❌ ПЛОХО: "базовые задания на правила"
+✅ ХОРОШО: "Вставь пропущенные буквы: (не) был, (не) навидеть"
+"""
+    elif subject.lower() == "физика":
+        subject_warning = """
+⚠️ ВАЖНО: Предмет — ФИЗИКА. Задания должны быть по физике:
+- формулы, законы, расчёты, физические явления
+
+❌ ПЛОХО: "задачи на понимание темы"
+✅ ХОРОШО: "Тело массой 2 кг движется со скоростью 3 м/с. Найди импульс."
+"""
+    
+    # Запрет на общие фразы
+    forbid_generic = """
+🚫 ЗАПРЕЩЕНО использовать общие фразы:
+- "простые вопросы по теме"
+- "задания на понимание"
+- "сложные аналитические вопросы"
+- "базовый/средний/продвинутый уровень"
+- "вариант материала"
+
+Каждое задание должно содержать КОНКРЕТНЫЙ ТЕКСТ (1-3 предложения) с реальными вопросами.
+"""
+    
+    return f"""Ты — опытный педагог по {subject}, {grade} класс.
+{subject_warning}
+{forbid_generic}
+
+Сгенерируй {p.task_count} КОНКРЕТНЫХ заданий по теме "{topic}" с параметрами:
+- Типы заданий: {_types_str(p.task_types)}
+- Распределение сложности: {p.difficulty_distribution}
+- Формат ответа: {p.answer_format}
 {_game_block(p)}
 {_profile_block(teacher_profile)}
 {_pedagogical_block(p)}
 
-Верни строго JSON:
+ПРИМЕР ХОРОШЕГО ОТВЕТА (для литературы):
 {{
   "tasks": [
     {{
-      "text": "текст задания",
-      "options": ["вариант1", "вариант2", "вариант3", "вариант4"],
-      "correct": 0,
-      "time_limit_sec": 30,
+      "text": "Назови главного героя романа 'Евгений Онегин'. Какие черты его характера проявляются в первой главе?",
+      "options": null,
+      "correct": "Евгений Онегин, разочарование, скука, эгоизм",
+      "time_limit_sec": 60,
       "adaptive_level": 1,
-      "type": "test"
+      "type": "open"
+    }},
+    {{
+      "text": "Почему Онегин отверг любовь Татьяны? Приведи 2 причины из текста.",
+      "options": null,
+      "correct": "1) Боязнь семейной жизни, 2) Ценил свободу",
+      "time_limit_sec": 90,
+      "adaptive_level": 2,
+      "type": "open"
     }}
-  ],
-  "sources": [],
-  "typical_mistakes": [],
-  "timeline": [],
-  "reflection": null
+  ]
 }}
 
-Правила качества:
-- Верни РОВНО {p.task_count} объектов в массиве tasks.
-- Для теста: 4 варианта, дистракторы правдоподобны; options — массив из 4 строк, correct — индекс 0..3.
-- Для открытого вопроса: options = null, correct — краткая строка-эталон для проверки.
-- Поле type одно из: test, open, problem, creative, graph.
-- adaptive_level: целое 1..3 (1=база, 3=сложный).
-- НЕ используй темы-табу из профиля (если указаны).
+Верни ТОЛЬКО JSON. Без пояснений.
 """
 
 
@@ -226,8 +271,8 @@ def prompt_regenerate_task(*, original_task: Task, topic: str, grade: int, feedb
 Класс: {grade}
 Пожелания учителя: {fb}
 
-Верни JSON ОДНОГО задания (как элемент массива tasks):
-{{"text": "...", "options": [...], "correct": 0, "time_limit_sec": 30, "adaptive_level": {original_task.adaptive_level}, "type": "{original_task.type}"}}
+Верни JSON ОДНОГО задания:
+{{"text": "конкретное задание", "options": null, "correct": "ответ", "time_limit_sec": 30, "adaptive_level": {original_task.adaptive_level}, "type": "{original_task.type}"}}
 """
 
 
@@ -256,25 +301,20 @@ def prompt_student_final_advice(
 """
 
 
-def prompt_hot_mistakes(*, topic: str, grade: int, subject: str, count: int = 10) -> str:
+def prompt_hot_mistakes(*, topic: str, grade: int, subject: str, count: int = 5) -> str:
     """Промпт №11: «Горячая десятка» — список типичных ошибок по теме."""
-    return f"""Ты — методист по {subject} ({grade} класс). Составь горячую десятку
-типичных ошибок учеников по теме "{topic}".
+    return f"""Ты — методист по {subject} ({grade} класс). Составь список из {count} типичных ошибок учеников по теме "{topic}".
 
 Верни JSON:
 {{
   "mistakes": [
-    {{"mistake": "что делают не так",
-      "correct": "как правильно",
-      "why_happens": "почему так ошибаются",
-      "lifehack": "короткий лайфхак для запоминания"}}
+    {{"mistake": "конкретная ошибка", "correct": "как правильно", "why_happens": "почему ошибаются"}}
   ]
 }}
 
 Правила:
-- Ровно {count} ошибок.
-- Формулируй кратко и конкретно (1 предложение на поле).
-- Без воды и без воспитательных эпитетов.
+- Конкретные формулировки, не общие фразы.
+- Для литературы: укажи реальные ошибки в анализе текста.
 """
 
 
@@ -291,10 +331,7 @@ def prompt_example_with_mistakes(*, title: str, content: str, grade: int) -> str
 Верни JSON:
 {{
   "example_mistakes": [
-    {{"wrong_answer": "типичный неправильный ответ ученика",
-      "why_wrong": "почему это ошибка",
-      "correct_answer": "правильный ответ",
-      "teacher_comment": "что сказать классу"}}
+    {{"wrong_answer": "неправильный ответ", "why_wrong": "почему ошибка", "correct_answer": "правильный ответ", "teacher_comment": "комментарий учителя"}}
   ]
 }}
 """
@@ -329,40 +366,29 @@ def _kit_pedagogical_block(params: "PedagogicalFeatures | None") -> str:
         if params.sources.mode == "my":
             names = ", ".join(src.get("name", "") for src in params.sources.my_sources if src.get("name"))
             blocks.append(
-                f"К каждой раздатке добавь поле sources — массив с одним объектом "
-                f'{{"name": "..."}}, используй ТОЛЬКО эти источники: {names or "(пусто)"}.'
+                f"К каждой раздатке добавь поле sources: [{{\"name\": \"{names or 'учебник'}\"}}]"
             )
         else:
             blocks.append(
-                "К каждой раздатке добавь поле sources — массив 1–2 реалистичных источника "
-                "(учебник, ВПР, ФГОС, авторская разработка) в формате [{\"name\": \"...\"}]."
+                "К каждой раздатке добавь поле sources: [{\"name\": \"учебник/ВПР/ФГОС\"}]"
             )
     if params.mistakes.enabled:
         blocks.append(
-            f"Сгенерируй блок typical_mistakes (горячая десятка) — массив из "
-            f"{params.mistakes.count} типичных ошибок по теме с полями mistake, correct, why_happens"
-            + (", lifehack" if params.mistakes.add_lifehacks else "")
-            + (", common_trap" if params.mistakes.add_common_traps else "")
-            + "."
+            f"Добавь typical_mistakes — {params.mistakes.count} типичных ошибок с полями mistake, correct, why_happens"
         )
     if params.timing.enabled:
         blocks.append(
-            f"Сгенерируй timeline для урока длительностью {params.timing.lesson_duration} минут — "
-            "массив объектов {stage, minutes, item_indices}."
-            + (" Добавь extra_tasks с запасными заданиями." if params.timing.add_extra_tasks else "")
+            f"Добавь timeline для урока {params.timing.lesson_duration} мин"
         )
     if params.scaffolding.enabled:
         blocks.append(
-            f"Для каждой раздатки уровня сложности {params.scaffolding.min_level} и выше "
-            f"добавь scaffolding_steps — массив пошаговых подсказок (стиль: {params.scaffolding.style})."
+            f"Для сложных заданий добавь scaffolding_steps (стиль: {params.scaffolding.style})"
         )
     if params.emotional.enabled:
         blocks.append(
-            f"В блок reflection положи объект для эмоциональной рефлексии типа {params.emotional.type} "
-            "с полями question, options."
-            + (" Добавь creative_task — короткое творческое задание." if params.emotional.add_creative else "")
+            f"Добавь reflection для эмоциональной рефлексии (тип: {params.emotional.type})"
         )
-    return ("\n".join("- " + b for b in blocks) + "\n") if blocks else ""
+    return "\n".join(f"- {b}" for b in blocks) if blocks else ""
 
 
 def _kit_profile_block(profile: dict[str, Any] | None) -> str:
@@ -373,8 +399,7 @@ def _kit_profile_block(profile: dict[str, Any] | None) -> str:
 - Сложность: {profile.get("preferred_difficulty", "medium")}
 - Любимые типы: {", ".join(profile.get("preferred_task_types", []))}
 - Стиль: {profile.get("language_style", "friendly")}
-- ТЕМЫ-ТАБУ (исключи): {", ".join(profile.get("hates_topics", []))}
-- Подсказки: {profile.get("hint_style", "step_by_step")}
+- ТЕМЫ-ТАБУ: {", ".join(profile.get("hates_topics", []))}
 """
 
 
@@ -389,55 +414,65 @@ def prompt_generate_kit_from_plan(
     pedagogical: Any | None = None,
     teacher_profile: dict[str, Any] | None = None,
 ) -> str:
+    """Промпт №10: генерация комплекта раздаток по плану урока."""
     complexity_names = {1: "базовый (для слабых)", 2: "средний", 3: "продвинутый (для сильных)"}
-    return f"""Ты — эксперт по разработке учебных материалов по ФГОС.
+    
+    # Предупреждение о конкретике
+    forbid_generic = """
+🚫 ЗАПРЕЩЕНО использовать общие фразы:
+- "базовый вариант материала"
+- "средний вариант материала"
+- "продвинутый вариант материала"
+- "задания на понимание темы"
 
-План урока (JSON): {lesson_plan}
+Каждый content_levels.basic/medium/advanced должен содержать КОНКРЕТНЫЙ ТЕКСТ ЗАДАНИЯ.
+"""
+    
+    # Предупреждение о предмете
+    subject_warning = ""
+    if subject.lower() == "литература":
+        subject_warning = """
+⚠️ ВАЖНО: Предмет — ЛИТЕРАТУРА. Все задания по литературе.
+Пример хорошего задания: "Почему Онегин отверг любовь Татьяны? Приведи 2 причины."
+"""
+    
+    return f"""Ты — эксперт по разработке учебных материалов по ФГОС.
+Предмет: {subject}, {grade} класс.
+{subject_warning}
+{forbid_generic}
+
+План урока: {lesson_plan}
 Тема: {topic or "определи по плану"}
-Класс: {grade}
-Предмет: {subject}
 Тип урока: {lesson_type or "комбинированный"}
-Глобальная сложность: {complexity_names.get(global_complexity, "средний")}
+Глобальная сложность: {complexity_names.get(global_complexity, "средный")}
 
 {_kit_profile_block(teacher_profile)}
 
-Для каждого этапа, где needs_handout = true, сгенерируй ОДНУ раздатку.
-Тип раздатки бери из recommended_handout_type этапа.
+Для каждого этапа, где needs_handout = true, сгенерируй раздатку.
+Тип раздатки из recommended_handout_type.
 
-Верни строго валидный JSON:
+ПРИМЕР ХОРОШЕГО ОТВЕТА (литература):
 {{
   "items": [
     {{
-      "stage_name": "Актуализация знаний",
-      "type": "cards",
-      "title": "Карточки для разминки",
+      "stage_name": "Анализ текста",
+      "type": "worksheet",
+      "title": "Рабочий лист",
       "content_levels": {{
-        "basic": "текст для слабых учеников",
-        "medium": "текст для средних учеников",
-        "advanced": "текст для сильных учеников"
+        "basic": "Назови главного героя. Кто его автор?",
+        "medium": "Почему герой совершил этот поступок? Приведи 2 аргумента.",
+        "advanced": "Сравни героя с другим персонажем. В чём их противопоставление?"
       }},
       "complexity_level": 2,
-      "teacher_notes": "методические заметки (1-2 предложения)",
-      "answer_key": {{"basic": "ответ", "medium": "ответ", "advanced": "ответ"}},
-      "scaffolding_steps": [],
-      "sources": [],
-      "example_mistakes": []
+      "teacher_notes": "Обрати внимание на аргументацию",
+      "answer_key": {{
+        "basic": "Евгений Онегин, Пушкин",
+        "medium": "1) скука, 2) разочарование в жизни",
+        "advanced": "Онегин — лишний человек, Ленский — романтик"
+      }}
     }}
-  ],
-  "typical_mistakes": [],
-  "timeline": [],
-  "reflection": null
+  ]
 }}
 
-Правила:
-- Сгенерируй 3-6 раздаток (по числу этапов с needs_handout=true).
-- Поле type СТРОГО одно из: cards, worksheet, memo, reflection, table, schema, homework.
-- content_levels.basic / medium / advanced — РАЗНЫЕ по сложности тексты, не дублируй.
-- Базовая сложность глобально равна {global_complexity}: для basic снижай на 1, для advanced повышай на 1.
-- answer_key для каждого уровня — короткий эталонный ответ или критерий.
-- teacher_notes — конкретные подсказки учителю (тайминг, акценты, типичные затыки).
-- Если в плане есть домашнее задание — используй type=homework на этом этапе.
-
-Особые требования (педагогические фишки):
-{_kit_pedagogical_block(pedagogical)}
+Верни ТОЛЬКО JSON. Без пояснений.
 """
